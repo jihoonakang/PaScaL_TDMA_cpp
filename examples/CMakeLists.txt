@@ -17,22 +17,20 @@ add_executable(manyRHS_example manyRHS.cpp)
 target_include_directories(manyRHS_example PRIVATE ${PROJECT_SOURCE_DIR}/src)
 target_link_libraries(manyRHS_example PRIVATE PaScaL_TDMA MPI::MPI_CXX)
 
-# 소스 파일
-add_executable(cuMany cuManyTest.cpp)
-set_source_files_properties(cuManyTest.cpp PROPERTIES LANGUAGE CUDA)
+if(CUDA)
 
-# 커널 헤더 include 가능하도록 설정
-target_include_directories(cuMany PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    # 소스 파일
+    add_executable(cuMany cuManyTest.cpp)
+    set_source_files_properties(cuManyTest.cpp PROPERTIES LANGUAGE CUDA)
 
-# CUDA 연동 (대부분 자동이지만 명시적으로 선언)
-target_link_libraries(cuMany PRIVATE cuda PaScaL_TDMA MPI::MPI_CXX)
+    target_include_directories(cuMany PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_link_libraries(cuMany PRIVATE cuda PaScaL_TDMA MPI::MPI_CXX)
 
-# 소스 파일
-add_executable(cuManyRHS cuManyRHSTest.cpp)
-set_source_files_properties(cuManyRHSTest.cpp PROPERTIES LANGUAGE CUDA)
+    # 소스 파일
+    add_executable(cuManyRHS cuManyRHSTest.cpp)
+    set_source_files_properties(cuManyRHSTest.cpp PROPERTIES LANGUAGE CUDA)
 
-# 커널 헤더 include 가능하도록 설정
-target_include_directories(cuManyRHS PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_include_directories(cuManyRHS PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_link_libraries(cuManyRHS PRIVATE cuda PaScaL_TDMA MPI::MPI_CXX)
 
-# CUDA 연동 (대부분 자동이지만 명시적으로 선언)
-target_link_libraries(cuManyRHS PRIVATE cuda PaScaL_TDMA MPI::MPI_CXX)
+endif()

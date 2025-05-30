@@ -1,9 +1,13 @@
 cmake_minimum_required(VERSION 3.19)
-project(PaScaL_TDMA_CPP LANGUAGES CXX CUDA)
+option(CUDA "Enable GPU (CUDA) support" OFF)
+if(CUDA)
+    project(PaScaL_TDMA_CPP LANGUAGES CXX CUDA)
+else()
+    project(PaScaL_TDMA_CPP LANGUAGES CXX)
+endif()
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CUDA_STANDARD 17)
 
 # Find MPI
 find_package(MPI REQUIRED)
@@ -16,11 +20,17 @@ include(CTest)
 enable_testing()
 
 # Enable device linking
-set(CMAKE_CUDA_SEPARABLE_COMPILATION ON)
-set(CMAKE_CUDA_ARCHITECTURES 75)  # Adjust to your GPU (e.g., 86 for Ampere)
-set(CUDA_TOOLKIT_ROOT_DIR /usr/local/cuda)  # 또는 실제 설치 경로
-include_directories(${CUDA_INCLUDE_DIRS})
-enable_language(CUDA)
+if(CUDA)
+    set(CMAKE_CUDA_STANDARD 17)
+    enable_language(CUDA)
+    set(CMAKE_CUDA_SEPARABLE_COMPILATION ON)
+    set(CMAKE_CUDA_ARCHITECTURES 75)  # Adjust to your GPU (e.g., 86 for Ampere)
+    set(CUDA_TOOLKIT_ROOT_DIR /usr/local/cuda)  # 또는 실제 설치 경로
+    include_directories(${CUDA_INCLUDE_DIRS})
+    message(STATUS "GPU support ENABLED (CUDA)")
+else()
+    message(STATUS "GPU support DISABLED")
+endif()
 
 # Add subdirectories
 add_subdirectory(src)
@@ -29,11 +39,21 @@ add_subdirectory(examples)
 add_subdirectory(examples/convection3D)
 
 # Python binding
-option(ENABLE_PYTHON "Enable compilation of the Python module" ON)
-if(ENABLE_PYTHON)
+option(PYTHON "Enable compilation of the Python module" ON)
+if(PYTHON)
     set(PYBIND11_FINDPYTHON ON)
-    set(CMAKE_PREFIX_PATH "/home/jihoon/miniconda3/envs/xccels/lib/python3.11/site-packages/pybind11")
-    set(Python_EXECUTABLE "/home/jihoon/miniconda3/envs/xccels/bin/python" CACHE FILEPATH "Python 3.11 interpreter path")
+    # Try to get CONDA_PREFIX from environment
+    if(DEFINED ENV{CONDA_PREFIX})
+        set(PYTHON_ENV_PATH "$ENV{CONDA_PREFIX}" CACHE PATH "Python environment path")
+        message(STATUS "Detected conda environment: ${PYTHON_ENV_PATH}")
+    else()
+        # Fallback: manually set or use default
+        set(PYTHON_ENV_PATH "/usr" CACHE PATH "Default python env path")
+        message(WARNING "CONDA_PREFIX not set, using default path: ${PYTHON_ENV_PATH}")
+    endif()
+
+    set(CMAKE_PREFIX_PATH "${PYTHON_ENV_PATH}/lib/python3.11/site-packages/pybind11")
+    set(Python_EXECUTABLE "${PYTHON_ENV_PATH}/bin/python" CACHE FILEPATH "Python 3.11 interpreter path")
 
     find_package(pybind11 REQUIRED) # or add_subdirectory(pybind11)
 
