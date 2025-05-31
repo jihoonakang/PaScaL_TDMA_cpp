@@ -1,36 +1,25 @@
+# Function to add a CPU-based example
+function(add_pascal_example target_name source_file)
+    add_executable(${target_name} ${source_file})
+    target_include_directories(${target_name} PRIVATE ${PROJECT_SOURCE_DIR}/src)
+    target_link_libraries(${target_name} PRIVATE PaScaL_TDMA MPI::MPI_CXX)
+endfunction()
 
-# Build the tdm_single example
-add_executable(single_example single.cpp)
+# Function to add a CUDA-based example
+function(add_cuda_example target_name source_file)
+    add_executable(${target_name} ${source_file})
+    set_source_files_properties(${source_file} PROPERTIES LANGUAGE CUDA)
+    target_include_directories(${target_name} PRIVATE ${PROJECT_SOURCE_DIR}/src)
+    target_link_libraries(${target_name} PRIVATE cuda PaScaL_TDMA MPI::MPI_CXX)
+endfunction()
 
-target_include_directories(single_example PRIVATE ${PROJECT_SOURCE_DIR}/src)
-target_link_libraries(single_example PRIVATE PaScaL_TDMA MPI::MPI_CXX)
+# CPU examples
+add_pascal_example(single_example    single.cpp)
+add_pascal_example(many_example      many.cpp)
+add_pascal_example(manyRHS_example   manyRHS.cpp)
 
-# Build the tdm_many_2D example
-add_executable(many_example many.cpp)
-
-target_include_directories(many_example PRIVATE ${PROJECT_SOURCE_DIR}/src)
-target_link_libraries(many_example PRIVATE PaScaL_TDMA MPI::MPI_CXX)
-
-# Build the tdm_many_RHS_3D example
-add_executable(manyRHS_example manyRHS.cpp)
-
-target_include_directories(manyRHS_example PRIVATE ${PROJECT_SOURCE_DIR}/src)
-target_link_libraries(manyRHS_example PRIVATE PaScaL_TDMA MPI::MPI_CXX)
-
+# CUDA examples
 if(CUDA)
-
-    # 소스 파일
-    add_executable(cuMany cuManyTest.cpp)
-    set_source_files_properties(cuManyTest.cpp PROPERTIES LANGUAGE CUDA)
-
-    target_include_directories(cuMany PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
-    target_link_libraries(cuMany PRIVATE cuda PaScaL_TDMA MPI::MPI_CXX)
-
-    # 소스 파일
-    add_executable(cuManyRHS cuManyRHSTest.cpp)
-    set_source_files_properties(cuManyRHSTest.cpp PROPERTIES LANGUAGE CUDA)
-
-    target_include_directories(cuManyRHS PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
-    target_link_libraries(cuManyRHS PRIVATE cuda PaScaL_TDMA MPI::MPI_CXX)
-
+    add_cuda_example(cuMany     cuManyTest.cpp)
+    add_cuda_example(cuManyRHS  cuManyRHSTest.cpp)
 endif()
