@@ -4,10 +4,11 @@
 set(PASCAL_TDMA_SRC PaScaL_TDMA.cpp)
 
 if(CUDA)
-    list(APPEND PASCAL_TDMA_SRC TDMASolver.cu)
+    list(APPEND PASCAL_TDMA_SRC TDMASolver.cu PaScaL_TDMA.cu)
 
     # Ensure .cuh is treated as a CUDA file (header only)
     set_source_files_properties(TDMASolver.cuh PROPERTIES LANGUAGE CUDA)
+    set_source_files_properties(PaScaL_TDMA.cpp PROPERTIES LANGUAGE CUDA)
 endif()
 
 add_library(PaScaL_TDMA STATIC ${PASCAL_TDMA_SRC})
