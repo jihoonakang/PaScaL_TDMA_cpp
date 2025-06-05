@@ -4,8 +4,12 @@
 #include <cuda_runtime.h>
 #include "TDMASolver.hpp"
 #include "TDMASolver.cuh"
+#include "PaScaL_TDMA.cuh"
 
-int main() {
+int main(int argc, char** argv) {
+
+    MPI_Init(&argc, &argv);
+    
     const int nx = 15, ny = 40, nz = 40;
     const int N = nx * ny * nz;
 
@@ -30,10 +34,10 @@ int main() {
 
     std::vector<double> h_d_ref = h_d;
 
-    for (int i = 0; i < nx * ny * nz; i+=ny*nz) {
-        for (int j = 0; j < ny*nz; j++) std::cout << h_d_ref[i+j] << ' ';
-        std::cout<<std::endl;
-    }
+    // for (int i = 0; i < nx * ny * nz; i+=ny*nz) {
+    //     for (int j = 0; j < ny*nz; j++) std::cout << h_d_ref[i+j] << ' ';
+    //     std::cout<<std::endl;
+    // }
 
     // GPU 메모리 할당
     double *d_a, *d_b, *d_c, *d_d;
@@ -50,22 +54,27 @@ int main() {
     // CPU 참조 해 계산
     TDMASolver::manyCyclic(h_a.data(), h_b.data(), h_c.data(), h_d_ref.data(), nx, ny*nz);
 
-    for (int i = 0; i < nx * ny * nz; i+=ny*nz) {
-        for (int j = 0; j < ny*nz; j++) std::cout << h_d_ref[i+j] << ' ';
-        std::cout<<std::endl;
-    }
+    // for (int i = 0; i < nx * ny * nz; i+=ny*nz) {
+    //     for (int j = 0; j < ny*nz; j++) std::cout << h_d_ref[i+j] << ' ';
+    //     std::cout<<std::endl;
+    // }
 
     // 커널 호출
-    cuTDMASolver::cuManyCyclic(d_a, d_b, d_c, d_d, nx, ny, nz);
+    // cuTDMASolver::cuManyCyclic(d_a, d_b, d_c, d_d, nx, ny, nz);
+
+    cuPaScaL_TDMA::cuPTDMAPlanMany px_many;
+    px_many.create(nx, ny, nz, MPI_COMM_SELF, cuPaScaL_TDMA::TDMAType::Cyclic);
+    cuPaScaL_TDMA::cuPTDMASolverMany::cuSolve(px_many, d_a, d_b, d_c, d_d);
+    px_many.destroy();
 
     // 결과 복사 및 비교
     std::vector<double> h_d_out(N);
     cudaMemcpy(h_d_out.data(), d_d, N * sizeof(double), cudaMemcpyDeviceToHost);
 
-    for (int i = 0; i < nx * ny * nz; i+=ny*nz) {
-        for (int j = 0; j < ny*nz; j++) std::cout << h_d_out[i+j] << ' ';
-        std::cout<<std::endl;
-    }
+    // for (int i = 0; i < nx * ny * nz; i+=ny*nz) {
+    //     for (int j = 0; j < ny*nz; j++) std::cout << h_d_out[i+j] << ' ';
+    //     std::cout<<std::endl;
+    // }
 
     double error = 0.0;
     for (int i = 0; i < N; ++i) {
@@ -75,5 +84,7 @@ int main() {
     std::cout << "Total error: " << error << std::endl;
 
     cudaFree(d_a); cudaFree(d_b); cudaFree(d_c); cudaFree(d_d);
+    MPI_Finalize();
+
     return 0;
 }

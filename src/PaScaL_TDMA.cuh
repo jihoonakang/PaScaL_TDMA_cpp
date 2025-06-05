@@ -4,29 +4,65 @@
 #include <mpi.h>
 #include "dimArray.hpp"
 #include "util.hpp"
-#include "PaScaL_TDMA.hpp"
 #include <cuda_runtime.h>
 
-namespace PaScaL_TDMA {
+namespace cuPaScaL_TDMA {
 
-    class cuPTDMAPlanMany : public PTDMAPlanBase {
+    enum class TDMAType {
+        Standard,
+        Cyclic
+    };
+
+    enum class BatchType {
+        Single,
+        Many,
+        ManyRHS
+    };
+
+    class cuPTDMAPlanBase {
+    
+    protected:
+        MPI_Comm comm_ptdma = MPI_COMM_NULL;
+        int rank = 0;
+        int size = 1;
+
+        std::vector<int> count_send, displ_send;
+        std::vector<int> count_recv, displ_recv;
+        TDMAType type;
+
+    public:
+        virtual ~cuPTDMAPlanBase() = default;
+
+        virtual void create(int n_row_, int ny_sys_, int nz_sys_, MPI_Comm comm_ptdma_, 
+                            TDMAType type_);
+        virtual void create(int n_row_, int ny_sys_, int nz_sys_, MPI_Comm comm_ptdma_);
+
+        virtual void destroy() = 0;
+        inline int getMPIRank() const { return rank; };
+        inline int getMPISize() const { return size; };
+    };
+
+    class cuPTDMAPlanMany : public cuPTDMAPlanBase {
 
     friend class cuPTDMASolverMany;
 
     private:
-        int n_sys = 0;
         int n_row = 0;
-        int n_sys_rt = 0;
+        int n_sys = 0;
+        int ny_sys = 0;
+        int nz_sys = 0;
+
         int n_row_rt = 0;
+        int n_sys_rt = 0;
+        int ny_sys_rt = 0;
+        int nz_sys_rt = 0;
 
-        std::vector<MPI_Datatype> ddtype_FS, ddtype_BS;
-
-        double *d_A_rd = nullptr, *d_B_rd = nullptr, *d_C_rd = nullptr, *d_D_rd = nullptr;
-        double *d_A_rt = nullptr, *d_B_rt = nullptr, *d_C_rt = nullptr, *d_D_rt = nullptr;
+        double *d_a_rd = nullptr, *d_b_rd = nullptr, *d_c_rd = nullptr, *d_d_rd = nullptr;
+        double *d_a_rt = nullptr, *d_b_rt = nullptr, *d_c_rt = nullptr, *d_d_rt = nullptr;
 
     public:
-        using PTDMAPlanBase::create;
-        void create(int n_row_, int n_sys_, MPI_Comm comm_ptdma_, 
+        using cuPTDMAPlanBase::create;
+        void create(int n_row_, int ny_sys_, int nz_sys_, MPI_Comm comm_ptdma_, 
                     TDMAType type_) override;
         void destroy() override;
 
@@ -46,17 +82,16 @@ namespace PaScaL_TDMA {
         { cuSolve(plan, A.data(), B.data(), C.data(), D.data()); }
     };
 
-    // template <BatchType batch_type>
-    // void dispatchTDMASolver(TDMAType type, double* A, double* B, double* C, double* D, int n_row, int n_sys);
+    template <BatchType batch_type>
+    void cuDispatchTDMASolver(TDMAType type, double* A, double* B, double* C, double* D, int n_row, int ny, int nz);
 
-    // template <TDMAType tdma_type, BatchType batch_type>
-    // void batchSolver(double* A, double* B, double* C, double* D, int n_row, int n_sys);
+    template <TDMAType tdma_type, BatchType batch_type>
+    void cuBatchSolver(double* A, double* B, double* C, double* D, int n_row, int ny, int nz);
 
-    // extern template void batchSolver<TDMAType::Standard, BatchType::Single>(double*, double*, double*, double*, int, int);
-    // extern template void batchSolver<TDMAType::Cyclic, BatchType::Single>(double*, double*, double*, double*, int, int);
-    // extern template void batchSolver<TDMAType::Standard, BatchType::Many>(double*, double*, double*, double*, int, int);
-    // extern template void batchSolver<TDMAType::Cyclic, BatchType::Many>(double*, double*, double*, double*, int, int);
-    // extern template void batchSolver<TDMAType::Standard, BatchType::ManyRHS>(double*, double*, double*, double*, int, int);
-    // extern template void batchSolver<TDMAType::Cyclic, BatchType::ManyRHS>(double*, double*, double*, double*, int, int);
-
-} // namespace PaScaL_TDMA
+    extern template void cuBatchSolver<TDMAType::Standard, BatchType::Single>(double*, double*, double*, double*, int, int, int);
+    extern template void cuBatchSolver<TDMAType::Cyclic, BatchType::Single>(double*, double*, double*, double*, int, int, int);
+    extern template void cuBatchSolver<TDMAType::Standard, BatchType::Many>(double*, double*, double*, double*, int, int, int);
+    extern template void cuBatchSolver<TDMAType::Cyclic, BatchType::Many>(double*, double*, double*, double*, int, int, int);
+    extern template void cuBatchSolver<TDMAType::Standard, BatchType::ManyRHS>(double*, double*, double*, double*, int, int, int);
+    extern template void cuBatchSolver<TDMAType::Cyclic, BatchType::ManyRHS>(double*, double*, double*, double*, int, int, int);
+} // namespace cuPaScaL_TDMA

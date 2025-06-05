@@ -10,12 +10,12 @@ __global__ static void cuManyKernel(const double* __restrict__ a,
     // Global (j,k) index
     int j = blockIdx.y * blockDim.y + threadIdx.y;
     int k = blockIdx.x * blockDim.x + threadIdx.x;
-    int gid = k + j * nz;
     if (j >= ny || k >= nz) return;
+    int gid = k + j * nz;
 
     int tj = threadIdx.y;
     int tk = threadIdx.x;
-    int tid = tk + tj * blockDim.x;
+    int tid = tk + tj * (blockDim.x + 1);
 
     extern __shared__ double shared[];
     double* a1 = shared;
@@ -97,9 +97,9 @@ __global__ static void cuManyCyclicKernel(const double* __restrict__ a,
 
     int tj = threadIdx.y;
     int tk = threadIdx.x;
-    int tid = tk + tj * blockDim.x;
+    int tid = tk + tj * (blockDim.x + 1);
 
-    int stride = ny * nz;
+    const int stride = ny * nz;
     int gid = j * nz + k;
 
     extern __shared__ double shared[];
@@ -239,7 +239,7 @@ __global__ static void cuManyRHSKernel(const double* __restrict__ a,
 
     int tj = threadIdx.y;
     int tk = threadIdx.x;
-    int tid = tk + tj * blockDim.x;
+    int tid = tk + tj * (blockDim.x + 1);
 
     // Forward sweep
     double b1 = b[0];
@@ -302,10 +302,12 @@ __global__ static void cuManyRHSCyclicKernel(const double* __restrict__ a,
     int j = blockIdx.y * blockDim.y + threadIdx.y;
     int k = blockIdx.x * blockDim.x + threadIdx.x;
     if (j >= ny || k >= nz) return;
-
-    int tid = threadIdx.y * blockDim.x + threadIdx.x;
-    const int stride = ny * nz;
     int gid = j * nz + k;
+
+    int tj = threadIdx.y;
+    int tk = threadIdx.x;
+    int tid = tk + tj * (blockDim.x + 1);
+    const int stride = ny * nz;
 
     double c_local[256], e[256]; //Solving race condition. TODO: memory problem
     for (int i = 0; i < nx; i++) c_local[i] = c[i];
