@@ -21,6 +21,8 @@ pybind11_add_module(PaScaL_TDMA_pybind
     ${CMAKE_SOURCE_DIR}/src/PaScaL_TDMA.cpp
 )
 
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -flto=auto")
+
 target_include_directories(PaScaL_TDMA_pybind PUBLIC
     ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_SOURCE_DIR}/utils

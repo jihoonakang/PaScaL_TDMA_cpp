@@ -8,7 +8,6 @@ if(CUDA)
 
     # Ensure .cuh is treated as a CUDA file (header only)
     set_source_files_properties(TDMASolver.cuh PROPERTIES LANGUAGE CUDA)
-    set_source_files_properties(PaScaL_TDMA.cpp PROPERTIES LANGUAGE CUDA)
 endif()
 
 add_library(PaScaL_TDMA STATIC ${PASCAL_TDMA_SRC})

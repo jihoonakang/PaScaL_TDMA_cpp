@@ -4,9 +4,6 @@
 #include <mpi.h>
 #include "dimArray.hpp"
 #include "util.hpp"
-#ifdef __CUDACC__  // CUDA 컴파일러일 때만 포함
-#include <cuda_runtime.h>
-#endif
 
 namespace PaScaL_TDMA {
 
@@ -75,7 +72,6 @@ namespace PaScaL_TDMA {
     class PTDMAPlanMany : public PTDMAPlanBase {
 
     friend class PTDMASolverMany;
-    friend class cuPTDMASolverMany;
 
     private:
         int n_sys = 0;
@@ -86,10 +82,6 @@ namespace PaScaL_TDMA {
         std::vector<MPI_Datatype> ddtype_FS, ddtype_BS;
         dimArray<double> A_rd, B_rd, C_rd, D_rd;
         dimArray<double> A_rt, B_rt, C_rt, D_rt;
-#ifdef CUDA
-        double *d_A_rd = nullptr, *d_B_rd = nullptr, *d_C_rd = nullptr, *d_D_rd = nullptr;
-        double *d_A_rt = nullptr, *d_B_rt = nullptr, *d_C_rt = nullptr, *d_D_rt = nullptr;
-#endif
 
     public:
         using PTDMAPlanBase::create;
@@ -174,12 +166,6 @@ namespace PaScaL_TDMA {
                                  std::vector<double>& A, std::vector<double>& B, 
                                  std::vector<double>& C, std::vector<double>& D)
         { solve(plan, A.data(), B.data(), C.data(), D.data()); }
-#ifdef CUDA
-        static inline void cuSolve(PTDMAPlanMany& plan, 
-                                 std::vector<double>& A, std::vector<double>& B, 
-                                 std::vector<double>& C, std::vector<double>& D)
-        { solve(plan, A.data(), B.data(), C.data(), D.data()); }
-#endif
     };
 
     class PTDMASolverManyRHS {

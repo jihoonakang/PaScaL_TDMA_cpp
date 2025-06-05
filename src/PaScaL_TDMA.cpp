@@ -1,14 +1,11 @@
-#include "PaScaL_TDMA.hpp"
-#include "TDMASolver.hpp"
 #include <vector>
 #include <mpi.h>
 #include <iostream>
 #include <numeric>
 #include <stdexcept>
 #include <cassert>
-#ifdef __CUDACC__  // CUDA 컴파일러일 때만 포함
-#include <cuda_runtime.h>
-#endif
+#include "PaScaL_TDMA.hpp"
+#include "TDMASolver.hpp"
 
 namespace PaScaL_TDMA {
 
@@ -189,17 +186,6 @@ namespace PaScaL_TDMA {
         count_recv.assign(size, 1);
         displ_recv.assign(size, 0);
 
-#ifdef CUDA
-        cudaMalloc((void**)&d_A_rd, sizeof(double) * n_row_rd * n_sys_rd);
-        cudaMalloc((void**)&d_B_rd, sizeof(double) * n_row_rd * n_sys_rd);
-        cudaMalloc((void**)&d_C_rd, sizeof(double) * n_row_rd * n_sys_rd);
-        cudaMalloc((void**)&d_D_rd, sizeof(double) * n_row_rd * n_sys_rd);
-
-        cudaMalloc((void**)&d_A_rt, sizeof(double) * n_row_rt * n_sys_rt);
-        cudaMalloc((void**)&d_B_rt, sizeof(double) * n_row_rt * n_sys_rt);
-        cudaMalloc((void**)&d_C_rt, sizeof(double) * n_row_rt * n_sys_rt);
-        cudaMalloc((void**)&d_D_rt, sizeof(double) * n_row_rt * n_sys_rt);
-#endif
         return;
     }
     
@@ -219,40 +205,6 @@ namespace PaScaL_TDMA {
         A_rd.clear(); B_rd.clear(); C_rd.clear(); D_rd.clear();
         A_rt.clear(); B_rt.clear(); C_rt.clear(); D_rt.clear();
 
-#ifdef CUDA
-    if (d_A_rd != nullptr) {
-        cudaFree(d_A_rd);
-        d_A_rd = nullptr;
-    }
-    if (d_B_rd != nullptr) {
-        cudaFree(d_B_rd);
-        d_B_rd = nullptr;
-    }
-    if (d_C_rd != nullptr) {
-        cudaFree(d_C_rd);
-        d_C_rd = nullptr;
-    }
-    if (d_D_rd != nullptr) {
-        cudaFree(d_D_rd);
-        d_D_rd = nullptr;
-    }
-    if (d_A_rt != nullptr) {
-        cudaFree(d_A_rt);
-        d_A_rt = nullptr;
-    }
-    if (d_B_rt != nullptr) {
-        cudaFree(d_B_rt);
-        d_B_rt = nullptr;
-    }
-    if (d_C_rt != nullptr) {
-        cudaFree(d_C_rt);
-        d_C_rt = nullptr;
-    }
-    if (d_D_rt != nullptr) {
-        cudaFree(d_D_rt);
-        d_D_rt = nullptr;
-    }
-#endif
         return;
     }    
 
