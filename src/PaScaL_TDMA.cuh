@@ -68,6 +68,8 @@ namespace cuPaScaL_TDMA {
 
         inline int getRowSize() const { return n_row; };
         inline int getSysSize() const { return n_sys; };
+        inline int getNySysSize() const { return ny_sys; };
+        inline int getNzSysSize() const { return nz_sys; };
     };
 
     class cuPTDMASolverMany {
