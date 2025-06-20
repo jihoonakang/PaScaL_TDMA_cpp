@@ -6,22 +6,14 @@
 #include "TDMASolver.cuh"
 
 // CUDA 커널
-__global__ void cuManyModifiedThomasKernel(double* A, double* B, double* C, double* D, double* A_rd, double* B_rd, double* C_rd, double* D_rd, int n_row, int ny, int nz) {
+__global__ void cuInitValue(double* arr, int n, double val) {
+    int idx = threadIdx.x + blockIdx.x * blockDim.x;
+    if (idx < n) {
+        arr[idx] = val;
+    }
+}
 
-    // int j = blockIdx.x * blockDim.x + threadIdx.x;
-    // if (j >= n_sys) return;
-
-    // A[j] /= B[j]; D[j] /= B[j]; C[j] /= B[j];
-    // A[j + n_sys] /= B[j + n_sys]; D[j + n_sys] /= B[j + n_sys]; C[j + n_sys] /= B[j + n_sys];
-
-    // for (int i = 2; i < n_row; ++i) {
-    //     int idx = i * n_sys + j;
-    //     int idx_prev = idx - n_sys;
-    //     double r = 1.0 / (B[idx] - A[idx] * C[idx_prev]);
-    //     D[idx] = r * (D[idx] - A[idx] * D[idx_prev]);
-    //     C[idx] = r * C[idx];
-    //     A[idx] = -r * A[idx] * A[idx_prev];
-    // }
+__global__ void cuManyModifiedThomasKernel(double* A, double* B, double* C, double* D, double* A_rd, double* C_rd, double* D_rd, int n_row, int ny, int nz) {
 
     // 2D grid/thread index
     int j = blockIdx.y * blockDim.y + threadIdx.y;
@@ -106,7 +98,6 @@ __global__ void cuManyModifiedThomasKernel(double* A, double* B, double* C, doub
     }
 
     A_rd[gid0 + stride] = a1[tid];
-    B_rd[gid0 + stride] = 1.0;
     C_rd[gid0 + stride] = c1[tid];
     D_rd[gid0 + stride] = d1[tid];
 
@@ -114,6 +105,8 @@ __global__ void cuManyModifiedThomasKernel(double* A, double* B, double* C, doub
     a1[tid] = a0[tid];
     c1[tid] = c0[tid];
     d1[tid] = d0[tid];
+
+    gid -= stride; // n_row - 2
 
     for (int i = n_row - 3; i >= 1; --i) {
         gid -= stride;         // offset = (i, j, k)
@@ -154,122 +147,134 @@ __global__ void cuManyModifiedThomasKernel(double* A, double* B, double* C, doub
     C[gid0] = c0[tid];
 
     A_rd[gid0] = a0[tid];
-    B_rd[gid0] = 1.0;
     C_rd[gid0] = c0[tid];
     D_rd[gid0] = d0[tid];
 
 }
 
-__global__ void cuReduceMany(const double* A, const double* C, const double* D,
-                             double* A0, double* A1, double* C0, double* C1,
-                             double* D0, double* D1,
-                             int n_row, int n_sys) {
-    int j = blockIdx.x * blockDim.x + threadIdx.x;
-    if (j >= n_sys) return;
-
-    double r = 1.0 / (1.0 - A[j + n_sys] * C[j]);
-    D0[j] = r * (D[j] - C[j] * D[j + n_sys]);
-    A0[j] = r * A[j];
-    C0[j] = -r * C[j] * C[j + n_sys];
-    A1[j] = A[(n_row - 1) * n_sys + j];
-    C1[j] = C[(n_row - 1) * n_sys + j];
-    D1[j] = D[(n_row - 1) * n_sys + j];
-}
-
 __global__ void cuReconstructMany(const double* A, const double* C, double* D,
-                                  const double* D0, const double* D1,
-                                  int n_row, int n_sys) {
-    int j = blockIdx.x * blockDim.x + threadIdx.x;
-    if (j >= n_sys) return;
+                                  const double* D_rd,
+                                  int n_row, int ny, int nz) {
 
-    D[0 * n_sys + j] = D0[j];
-    D[(n_row - 1) * n_sys + j] = D1[j];
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+    int k = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (j >= ny || k >= nz) return;
+
+    // Thread-local indices
+    int tj = threadIdx.y;
+    int tk = threadIdx.x;
+
+    int tile_pitch = blockDim.x + 1;
+    int tid = tk + tj * tile_pitch;
+
+    // Allocate shared memory
+    extern __shared__ double shared[];
+
+    double* ds = shared;
+    double* de = ds + tile_pitch * blockDim.y;
+
+    int gid = j * nz + k;            // system index
+    int stride  = ny * nz;
+
+    // Load reduced system solutions into shared memory
+    ds[tid] = D_rd[gid];             // d_rd(:,:,1)
+    de[tid] = D_rd[gid + stride];    // d_rd(:,:,2)
+    __syncthreads();
+
+    // Update solution vector
+    D[gid] = ds[tid];                // d(:,:,1)
+    D[gid + (n_row - 1) * stride] = de[tid];  // d(:,:,nz_row)
 
     for (int i = 1; i < n_row - 1; ++i) {
-        int idx = i * n_sys + j;
-        D[idx] = D[idx] - A[idx] * D0[j] - C[idx] * D1[j];
+        gid += stride;
+        D[gid] -= A[gid] * ds[tid] + C[gid] * de[tid];
     }
 }
 
 
 // detach x-y slab into 1D array
-__global__ void mem_detach_slab_xz(const double* __restrict__ slab_xz,
+__global__ void mem_detach_slab_xy(const double* __restrict__ slab_xy,
                                 double* __restrict__ array1D,
-                                int n1, int n2, int n3, int nprocs) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
+                                int n1, int n2, int n3, int size) {
+    int k = blockIdx.x * blockDim.x + threadIdx.x;
     int j = blockIdx.y * blockDim.y + threadIdx.y;
-    int k = blockIdx.z * blockDim.z + threadIdx.z;
+    int i = blockIdx.z * blockDim.z + threadIdx.z;
 
-    if (i >= n1 || j >= n2 || k >= n3) return;
+    int n3_div = n3 / size;
 
-    int n1blksize = n1 / nprocs;
-    int blksize = n1blksize * n2 * n3;
+    if (i >= n1 * size || j >= n2 || k >= n3) return;
 
-    for (int kblk = 0; kblk < nprocs; ++kblk) {
-        if (i >= kblk * n1blksize && i < (kblk + 1) * n1blksize) {
-            int local_i = i - kblk * n1blksize;
-            int pos = local_i * n2 * n3 + j * n3 + k + kblk * blksize;
-            array1D[pos] = slab_xz[(i * n2 + j) * n3 + k];
-        }
+    int blksize = n1 * n2 * n3_div;
+
+    for (int rank = 0; rank < size; ++rank) {
+        int pos = i * n2 * n3_div + j * n3_div + k + rank * blksize;
+        array1D[pos] = slab_xy[(i + rank * n1) * n2 * n3_div + j * n3_div + k];
     }
 }
 
 // rebuild y-z slab from 1D array
 __global__ void mem_unite_slab_yz(const double* __restrict__ array1D,
                                 double* __restrict__ slab_yz,
-                                int n1, int n2, int n3, int nprocs) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
+                                int n1, int n2, int n3, int size) {
+    int k = blockIdx.x * blockDim.x + threadIdx.x;
     int j = blockIdx.y * blockDim.y + threadIdx.y;
-    int k = blockIdx.z * blockDim.z + threadIdx.z;
+    int i = blockIdx.z * blockDim.z + threadIdx.z;
 
-    if (i >= n1 || j >= n2 || k >= n3) return;
+    int n3_div = n3 / size;
 
-    int blksize = n1 * n2 * n3 / nprocs;
+    if (i >= n1 || j >= n2 || k >= n3_div) return;
 
-    for (int kblk = 0; kblk < nprocs; ++kblk) {
-        int pos = i * n2 * n3 + j * n3 + k + kblk * blksize;
-        slab_yz[(i * n2 + j) * n3 + (k + kblk * n3)] = array1D[pos];
+    int blksize = n1 * n2 * n3 / size;
+
+    for (int rank = 0; rank < size; ++rank) {
+        int pos = i * n2 * n3_div + j * n3_div + k + rank * blksize;
+        slab_yz[i * n2 * n3 + j * n3 + k + rank * n3_div] = array1D[pos];
     }
 }
 
 // detach y-z slab into 1D array
+// n1 : nx_row_rd = 2
+// n2 : ny_sys
+// n3 : nz_sys
+// block ( nx_row_rd, ny_sys, nz_sys_rt = nz_sys/size)
 __global__ void mem_detach_slab_yz(const double* __restrict__ slab_yz,
                                 double* __restrict__ array1D,
-                                int n1, int n2, int n3, int nprocs)
-{
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
+                                int n1, int n2, int n3, int size) {
+
+    int k = blockIdx.x * blockDim.x + threadIdx.x;
     int j = blockIdx.y * blockDim.y + threadIdx.y;
-    int k = blockIdx.z * blockDim.z + threadIdx.z;
+    int i = blockIdx.z * blockDim.z + threadIdx.z;
+
+    int n3_div = n3 / size;
 
     if (i >= n1 || j >= n2 || k >= n3) return;
 
-    int blksize = n1 * n2 * n3 / nprocs;
+    int blksize = n1 * n2 * n3_div;
 
-    for (int kblk = 0; kblk < nprocs; ++kblk) {
-        int pos = i * n2 * n3 + j * n3 + k + kblk * blksize;
-        array1D[pos] = slab_yz[(i * n2 + j) * n3 + (k + kblk * n3)];
+    for (int rank = 0; rank < size; rank++) {
+        int pos = i * n2 * n3_div + j * n3_div + k + rank * blksize;
+        array1D[pos] = slab_yz[i * n2 * n3 + j * n3 + k + rank * n3_div];
     }
 }
 
 // rebuild x-y slab from 1D array
-__global__ void mem_unite_slab_xz(const double* __restrict__ array1D,
-                                double* __restrict__ slab_xz,
-                                int n1, int n2, int n3, int nprocs) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
+__global__ void mem_unite_slab_xy(const double* __restrict__ array1D,
+                                double* __restrict__ slab_xy,
+                                int n1, int n2, int n3, int size) {
+    int k = blockIdx.x * blockDim.x + threadIdx.x;
     int j = blockIdx.y * blockDim.y + threadIdx.y;
-    int k = blockIdx.z * blockDim.z + threadIdx.z;
+    int i = blockIdx.z * blockDim.z + threadIdx.z;
 
-    if (i >= n1 || j >= n2 || k >= n3) return;
+    int n3_div = n3 / size;
 
-    int n1blksize = n1 / nprocs;
-    int blksize = n1blksize * n2 * n3;
+    if (i >= n1 || j >= n2 || k >= n3_div) return;
 
-    for (int kblk = 0; kblk < nprocs; ++kblk) {
-        if (i >= kblk * n1blksize && i < (kblk + 1) * n1blksize) {
-            int local_i = i - kblk * n1blksize;
-            int pos = local_i * n2 * n3 + j * n3 + k + kblk * blksize;
-            slab_xz[(i * n2 + j) * n3 + k] = array1D[pos];
-        }
+    int blksize = n1 * n2 * n3_div;
+
+    for (int rank = 0; rank < size; ++rank) {
+        int pos = i * n2 * n3_div + j * n3_div + k + rank * blksize;
+        slab_xy[(i + rank * n1) * n2 * n3_div + j * n3_div + k] = array1D[pos];
     }
 }
 
@@ -296,15 +301,18 @@ namespace cuPaScaL_TDMA {
         MPI_Comm_rank(comm_ptdma, &rank);
         type = type_;
 
-        const int n_sys_rd = n_sys;
-        const int n_row_rd = 2;
-        std::vector<int> n_sys_rt_array(size);
+        nz_sys_rd = nz_sys;
+        n_row_rd = 2;
+        std::vector<int> nz_sys_rt_array(size);
     
         // Compute local and global problem dimensions
-        n_sys_rt = Util::para_range_n(1, n_sys_rd, size, rank);
+        nz_sys_rt = Util::para_range_n(1, nz_sys_rd, size, rank);
         n_row_rt = n_row_rd * size;
 
-        MPI_Allgather(&n_sys_rt, 1, MPI_INT, n_sys_rt_array.data(), 1, MPI_INT, comm_ptdma);
+        MPI_Allgather(&nz_sys_rt, 1, MPI_INT, nz_sys_rt_array.data(), 1, MPI_INT, comm_ptdma);
+
+        n_sys_rd = nz_sys_rd * ny_sys;
+        n_sys_rt = nz_sys_rt * ny_sys;
     
         count_send.assign(size, 1);
         displ_send.assign(size, 0);
@@ -320,6 +328,44 @@ namespace cuPaScaL_TDMA {
         cudaMalloc((void**)&d_b_rt, sizeof(double) * n_row_rt * n_sys_rt);
         cudaMalloc((void**)&d_c_rt, sizeof(double) * n_row_rt * n_sys_rt);
         cudaMalloc((void**)&d_d_rt, sizeof(double) * n_row_rt * n_sys_rt);
+
+
+        threads         = dim3(8, 8, 1);
+
+        int ny_block = ny_sys / threads.x;
+        if (ny_block == 0 || (ny_sys % threads.x != 0)) {
+            std::cerr << "[Error] ny_sys should be a multiple of threads.x. "
+                    << "threads.x = " << threads.x << ", ny_sys = " << ny_sys << std::endl;
+            MPI_Finalize();
+            std::exit(EXIT_FAILURE);
+        }
+ 
+        int nz_block = nz_sys / threads.y;
+        if (nz_block == 0 || (nz_sys % threads.y != 0)) {
+            std::cerr << "[Error] nz_sys should be a multiple of threads.y. "
+                    << "threads.y = " << threads.y << ", nz_sys = " << nz_sys << std::endl;
+            MPI_Finalize();
+            std::exit(EXIT_FAILURE);
+        }
+
+        int nz_rt_block = nz_sys_rt / threads.y;
+        if (nz_rt_block == 0 || (nz_sys_rt % threads.y != 0)) {
+            std::cerr << "[Error] nz_sys_rt should be a multiple of threads.y. "
+                    << "threads.y = " << threads.y << ", nz_sys_rt = " << nz_sys_rt << std::endl;
+            MPI_Finalize();
+            std::exit(EXIT_FAILURE);
+        }
+
+        // Set dim3 thread/block configuration
+        blocks          = dim3(nz_block,    ny_block);
+        blocks_rt       = dim3(nz_rt_block, ny_block, 1);
+        blocks_alltoall = dim3(nz_rt_block, ny_block, n_row_rd);
+
+        const int thread_1d = threads.x * threads.y;
+        const int block_1d = n_row_rd * n_sys_rd / thread_1d;
+    
+        cuInitValue<<<block_1d, thread_1d>>>(d_b_rd, n_row_rd * n_sys_rd, 1.0);
+        cuInitValue<<<block_1d, thread_1d>>>(d_b_rt, n_row_rd * n_sys_rd, 1.0);
 
         return;
     }
@@ -371,141 +417,120 @@ namespace cuPaScaL_TDMA {
                         double* A, double* B, double* C, double* D) {
 
         const int n_row = plan.n_row;
-        const int n_sys = plan.n_sys;
         const int ny_sys = plan.ny_sys;
         const int nz_sys = plan.nz_sys;
         assert(n_row > 2);
 
         if (plan.size == 1) {
             cuDispatchTDMASolver<BatchType::Many>(plan.type, A, B, C, D, n_row, ny_sys, nz_sys);
-            std::cout << n_row << ' ' << nz_sys << ' ' << ny_sys << ' ' << n_sys << std::endl;
             return;
         }
 
-        // Device memory
-        double *d_A, *d_B, *d_C, *d_D;
-        cudaMalloc(&d_A, sizeof(double) * n_row * n_sys);
-        cudaMalloc(&d_B, sizeof(double) * n_row * n_sys);
-        cudaMalloc(&d_C, sizeof(double) * n_row * n_sys);
-        cudaMalloc(&d_D, sizeof(double) * n_row * n_sys);
+        int shmem_size = 9 * (plan.threads.x + 1) * plan.threads.y * sizeof(double);
 
-        cudaMemcpy(d_A, A, sizeof(double) * n_row * n_sys, cudaMemcpyHostToDevice);
-        cudaMemcpy(d_B, B, sizeof(double) * n_row * n_sys, cudaMemcpyHostToDevice);
-        cudaMemcpy(d_C, C, sizeof(double) * n_row * n_sys, cudaMemcpyHostToDevice);
-        cudaMemcpy(d_D, D, sizeof(double) * n_row * n_sys, cudaMemcpyHostToDevice);
+        cuManyModifiedThomasKernel<<<plan.blocks, plan.threads, shmem_size>>>
+            (A, B, C, D, plan.d_a_rd, plan.d_c_rd, plan.d_d_rd, n_row, ny_sys, nz_sys);
 
-        int threads = 256;
-        int blocks = (n_sys + threads - 1) / threads;
-
-        cuManyModifiedThomasKernel<<<blocks, threads>>>(d_A, d_B, d_C, d_D, plan.d_a_rd, plan.d_b_rd, plan.d_c_rd, plan.d_d_rd, n_row, ny_sys, nz_sys);
-        // cuBackwardMany<<<blocks, threads>>>(d_A, d_C, d_D, n_row, n_sys);
-        // cuReduceMany<<<blocks, threads>>>(d_A, d_C, d_D,
-        //                                 plan.d_a_rd, plan.d_a_rd + n_sys,
-        //                                 plan.d_c_rd, plan.d_c_rd + n_sys,
-        //                                 plan.d_d_rd, plan.d_d_rd + n_sys,
-        //                                 n_row, n_sys);
-
-        // MPI reduction transpose
-        MPI_Request request[3];
-        MPI_Status statuses[3];
-
-        // MPI_Ialltoallw(plan.d_a_rd, plan.count_send.data(), plan.displ_send.data(),
-        //             plan.ddtype_FS.data(),
-        //             plan.d_a_rt, plan.count_recv.data(), plan.displ_recv.data(),
-        //             plan.ddtype_BS.data(),
-        //             plan.comm_ptdma, &request[0]);
-
-        // MPI_Ialltoallw(plan.d_c_rd, plan.count_send.data(), plan.displ_send.data(),
-        //             plan.ddtype_FS.data(),
-        //             plan.d_c_rt, plan.count_recv.data(), plan.displ_recv.data(),
-        //             plan.ddtype_BS.data(),
-        //             plan.comm_ptdma, &request[1]);
-
-        // MPI_Ialltoallw(plan.d_d_rd, plan.count_send.data(), plan.displ_send.data(),
-        //             plan.ddtype_FS.data(),
-        //             plan.d_d_rt, plan.count_recv.data(), plan.displ_recv.data(),
-        //             plan.ddtype_BS.data(),
-        //             plan.comm_ptdma, &request[2]);
-        // MPI_Waitall(3, request, statuses);
+        transpose_slab_yz_to_xy(plan, plan.d_a_rd, plan.d_a_rt);
+        transpose_slab_yz_to_xy(plan, plan.d_c_rd, plan.d_c_rt);
+        transpose_slab_yz_to_xy(plan, plan.d_d_rd, plan.d_d_rt);
 
         cuDispatchTDMASolver<BatchType::Many>(plan.type,
                                             plan.d_a_rt, plan.d_b_rt,
                                             plan.d_c_rt, plan.d_d_rt,
-                                            plan.n_row_rt, plan.n_sys_rt, plan.n_sys_rt);
+                                            plan.n_row_rt, plan.ny_sys, plan.nz_sys_rt);
 
-        // MPI_Ialltoallw(plan.d_d_rt, plan.count_recv.data(), plan.displ_recv.data(),
-        //             plan.ddtype_BS.data(),
-        //             plan.d_d_rd, plan.count_send.data(), plan.displ_send.data(),
-        //             plan.ddtype_FS.data(),
-        //             plan.comm_ptdma, &request[0]);
-        // MPI_Waitall(1, request, statuses);
+        transpose_slab_xy_to_yz(plan, plan.d_d_rt, plan.d_d_rd);
 
-        cuReconstructMany<<<blocks, threads>>>(d_A, d_C, d_D,
-                                            plan.d_d_rd, plan.d_d_rd + n_sys,
-                                            n_row, n_sys);
+        shmem_size = 2 * (plan.threads.x + 1) * plan.threads.y * sizeof(double);
+        cuReconstructMany<<<plan.blocks, plan.threads, shmem_size>>>
+            (A, C, D, plan.d_d_rd, n_row, ny_sys, nz_sys);
 
-        cudaMemcpy(D, d_D, sizeof(double) * n_row * n_sys, cudaMemcpyDeviceToHost);
-
-        cudaFree(d_A); cudaFree(d_B); cudaFree(d_C); cudaFree(d_D);
+        cudaDeviceSynchronize();
     }
 
-    // Transpose slab from x-z to y-z direction
-    void cuPTDMASolverMany::transpose_slab_xz_to_yz(const ptdma_plan_many_cuda& p,
-                                const double* slab_xz,
-                                double* slab_yz) {
+    void cuPTDMASolverMany::transpose_slab_xy_to_yz(const cuPTDMAPlanMany& p,
+                                                    const double* slab_xy,
+                                                    double* slab_yz) {
+
         int blksize = p.n_row_rd * p.n_sys / p.size;
+        size_t buffer_size = sizeof(double) * p.n_row_rd * p.n_sys;
 
-        double* sendbuf;
-        double* recvbuf;
+        double* recvbuf_dev;
+        double* sendbuf_host;
+        double* recvbuf_host;
 
-        cudaMalloc((void**)&sendbuf, sizeof(double) * p.n_row_rd * p.n_sys);
-        cudaMalloc((void**)&recvbuf, sizeof(double) * p.n_row_rd * p.n_sys);
+        // GPU memory allocation
+        cudaMalloc((void**)&recvbuf_dev, buffer_size);
 
-        // Step 1: Detach x-y slab to 1D buffer
-        mem_detach_slab_xz<<<p.blocks_alltoall, p.threads>>>(
-            slab_xz, p.sendbuf, p.n_row_rd, p.ny_sys, p.nz_sys, p.size);
-        cudaDeviceSynchronize();
+        // Host (pinned) memory allocation
+        cudaMallocHost((void**)&sendbuf_host, buffer_size);
+        cudaMallocHost((void**)&recvbuf_host, buffer_size);
 
-        // Step 2: Alltoall communication
-        int ierr = MPI_Alltoall(sendbuf, blksize, MPI_DOUBLE,
-                                recvbuf, blksize, MPI_DOUBLE,
+        // Step 2: Device → Host copy. Detach x-y slab to device buffer is not required.
+        cudaMemcpy(sendbuf_host, slab_xy, buffer_size, cudaMemcpyDeviceToHost);
+
+        // Step 3: MPI Alltoall on host
+        int ierr = MPI_Alltoall(sendbuf_host, blksize, MPI_DOUBLE,
+                                recvbuf_host, blksize, MPI_DOUBLE,
                                 p.comm_ptdma);
         assert(ierr == MPI_SUCCESS);
 
-        // Step 3: Reconstruct y-z slab
+        // Step 4: Host → Device copy
+        cudaMemcpy(recvbuf_dev, recvbuf_host, buffer_size, cudaMemcpyHostToDevice);
+
+        // Step 5: Reconstruct y-z slab from device buffer
         mem_unite_slab_yz<<<p.blocks_alltoall, p.threads>>>(
-            recvbuf, slab_yz, p.n_row_rd, p.ny_sys, p.nz_sys, p.size);
+            recvbuf_dev, slab_yz, p.n_row_rd, p.ny_sys, p.nz_sys, p.size);
         cudaDeviceSynchronize();
-        cudaFree(sendbuf);
-        cudfFree(recvbuf);
+
+        // Cleanup
+        cudaFree(recvbuf_dev);
+        cudaFreeHost(sendbuf_host);
+        cudaFreeHost(recvbuf_host);
     }
 
     // Transpose slab from y-z to x-z direction
-    void cuPTDMASolverMany::transpose_slab_yz_to_xz(const cuPTDMAPlanMany& p,
+    void cuPTDMASolverMany::transpose_slab_yz_to_xy(const cuPTDMAPlanMany& p,
                                 const double* slab_yz,
-                                double* slab_xz) {
+                                double* slab_xy) {
+
         int blksize = p.n_row_rd * p.n_sys / p.size;
+        size_t buffer_size = sizeof(double) * p.n_row_rd * p.n_sys;
 
-        double* sendbuf;
-        double* recvbuf;
+        // GPU → Host로 중간 버퍼 설정
+        double* sendbuf_dev;
+        double* sendbuf_host;
+        double* recvbuf_host;
 
-        // Step 1: Detach y-z slab to 1D buffer
+        // Allocate GPU memory
+        cudaMalloc((void**)&sendbuf_dev, buffer_size);
+
+        // Allocate host memory (pinned memory for performance)
+        cudaMallocHost((void**)&sendbuf_host, buffer_size);
+        cudaMallocHost((void**)&recvbuf_host, buffer_size);
+
+        // Step 1: Detach y-z slab to 1D buffer (device memory)
         mem_detach_slab_yz<<<p.blocks_alltoall, p.threads>>>(
-            slab_yz, sendbuf, p.n_row_rd, p.ny_sys, p.nz_sys, p.size);
+            slab_yz, sendbuf_dev, p.n_row_rd, p.ny_sys, p.nz_sys, p.size);
         cudaDeviceSynchronize();
 
-        // Step 2: Alltoall communication
-        int ierr = MPI_Alltoall(sendbuf, blksize, MPI_DOUBLE,
-                                recvbuf, blksize, MPI_DOUBLE,
+        // Step 2: Copy device → host
+        cudaError_t err = cudaMemcpy(sendbuf_host, sendbuf_dev, buffer_size, cudaMemcpyDeviceToHost);
+
+        // Step 3: MPI Alltoall on host
+        int ierr = MPI_Alltoall(sendbuf_host, blksize, MPI_DOUBLE,
+                                recvbuf_host, blksize, MPI_DOUBLE,
                                 p.comm_ptdma);
         assert(ierr == MPI_SUCCESS);
 
-        // Step 3: Reconstruct x-y slab
-        mem_unite_slab_xz<<<p.blocks_alltoall, p.threads>>>(
-            recvbuf, slab_xz, p.n_row_rd, p.ny_sys, p.nz_sys, p.size);
-        cudaDeviceSynchronize();
-        cudaFree(sendbuf);
-        cudfFree(recvbuf);
+        // Step 4: Copy host → device. Reconstruct x-y slab from device memory is not required
+        cudaMemcpy(slab_xy, recvbuf_host, buffer_size, cudaMemcpyHostToDevice);
+
+        // Clean up
+        cudaFree(sendbuf_dev);
+        cudaFreeHost(sendbuf_host);
+        cudaFreeHost(recvbuf_host);
     }
 
     //================================

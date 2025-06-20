@@ -382,12 +382,12 @@ void cuTDMASolver::cuManyRHSCyclic(const double* a_d, const double* b_d, double*
     assert(nx > 2 && ny > 0 && nz > 0);
 
     // Allocate e (correction vector, same shape as d)
-    dim3 threads(16, 16);
+    dim3 threads(8, 8);
     dim3 blocks((nz + threads.x - 1) / threads.x,
                 (ny + threads.y - 1) / threads.y);
 
     int sys_size = (threads.x + 1) * threads.y;
-    size_t shmem = 6 * sys_size * sizeof(double);  // c0, c1, d0, d1, e0, e1
+    size_t shmem = 2 * sys_size * sizeof(double);  // c0, c1, d0, d1, e0, e1
 
     cuManyRHSCyclicKernel<<<blocks, threads, shmem, stream>>>(
         a_d, b_d, c_d, d_d, nx, ny, nz);

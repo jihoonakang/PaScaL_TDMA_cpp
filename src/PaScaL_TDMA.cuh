@@ -47,14 +47,19 @@ namespace cuPaScaL_TDMA {
     friend class cuPTDMASolverMany;
 
     private:
+        dim3 threads, blocks, blocks_rt, blocks_alltoall;
+
         int n_row = 0;
         int n_sys = 0;
         int ny_sys = 0;
         int nz_sys = 0;
 
+        int n_row_rd = 0;
         int n_row_rt = 0;
+        int n_sys_rd = 0;
         int n_sys_rt = 0;
-        int ny_sys_rt = 0;
+
+        int nz_sys_rd = 0;
         int nz_sys_rt = 0;
 
         double *d_a_rd = nullptr, *d_b_rd = nullptr, *d_c_rd = nullptr, *d_d_rd = nullptr;
@@ -74,6 +79,12 @@ namespace cuPaScaL_TDMA {
 
     class cuPTDMASolverMany {
     public:
+        static void transpose_slab_yz_to_xy(const cuPTDMAPlanMany& plan,
+                                const double* slab_yz,
+                                double* slab_xy);
+        static void transpose_slab_xy_to_yz(const cuPTDMAPlanMany& plan,
+                                const double* slab_xy,
+                                double* slab_yz);
         static void cuSolve(cuPTDMAPlanMany& plan,
                           double* A, double* B, double* C, double* D);
 

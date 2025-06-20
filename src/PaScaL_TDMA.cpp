@@ -293,16 +293,6 @@ namespace PaScaL_TDMA {
 
         if (plan.size == 1) {
             dispatchTDMASolver<BatchType::Many>(plan.type, A, B, C, D, n_row, n_sys);
-            // switch (plan.type) {
-            //     case TDMAType::Standard:
-            //         batchSolver<TDMAType::Standard, BatchType::Many>(A, B, C, D, n_row, n_sys);
-            //         break;
-            //     case TDMAType::Cyclic:
-            //         batchSolver<TDMAType::Cyclic, BatchType::Many>(A, B, C, D, n_row, n_sys);
-            //         break;
-            //     default:
-            //         throw std::invalid_argument("Unknown TDMAType");
-            // }
             return;
         }
 
