@@ -32,8 +32,7 @@ namespace PaScaL_TDMA {
     public:
         virtual ~PTDMAPlanBase() = default;
 
-        virtual void create(int n_row_, MPI_Comm comm_ptdma_, int root_rank_, 
-                            TDMAType type_);
+        virtual void create(int n_row_, MPI_Comm comm_ptdma_, TDMAType type_);
         virtual void create(int n_row_, int n_sys_, MPI_Comm comm_ptdma_, 
                             TDMAType type_);
         virtual void create(int n_row_, int n_sys_, MPI_Comm comm_ptdma_);
@@ -59,8 +58,7 @@ namespace PaScaL_TDMA {
 
     public:
         using PTDMAPlanBase::create;
-        void create(int n_row_, MPI_Comm comm_ptdma_, int root_rank_, 
-                    TDMAType type_) override;
+        void create(int n_row_, MPI_Comm comm_ptdma_, TDMAType type_) override;
         void destroy() override;
 
         inline int getRowSize() const { return n_row; };
@@ -135,7 +133,7 @@ namespace PaScaL_TDMA {
 
         using PTDMAPlanBase::create;
         void create(int n_row_, int n_sys_, MPI_Comm comm_ptdma_) override;
-        void destroy() ;
+        void destroy() override;
     };
 
     class PTDMASolverSingle {

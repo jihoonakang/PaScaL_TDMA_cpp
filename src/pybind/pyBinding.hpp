@@ -24,18 +24,17 @@ PYBIND11_MODULE(PaScaL_TDMA_pybind, m){
 py::class_<PTDMAPlanSingle>(m, "PTDMAPlanSingle")
         .def(py::init())
         .def("create",
-            [](PTDMAPlanSingle &plan, int n_row_, int comm_ptdma_fhandle_, int root_rank_, bool cyclic_){
+            [](PTDMAPlanSingle &plan, int n_row_, int comm_ptdma_fhandle_, bool cyclic_){
                 TDMAType type = TDMAType::Standard;
                 if(cyclic_) type = TDMAType::Cyclic;
 
-                plan.create(n_row_, MPI_Comm_f2c(static_cast<MPI_Fint>(comm_ptdma_fhandle_)), root_rank_, type);
+                plan.create(n_row_, MPI_Comm_f2c(static_cast<MPI_Fint>(comm_ptdma_fhandle_)), type);
 #ifdef DEBUG
                 std::cout << "Plan_single created with pybind." << std::endl;
 #endif
             },
             py::arg("n_row"),
             py::arg("communicator"),
-            py::arg("gather_rank"),
             py::arg("cyclic"),
             "Create plan_single")
         .def("destroy",

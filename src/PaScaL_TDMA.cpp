@@ -9,7 +9,7 @@
 
 namespace PaScaL_TDMA {
 
-    void PTDMAPlanBase::create(int n_row_, MPI_Comm comm_ptdma_, int root_rank_, TDMAType type_) {
+    void PTDMAPlanBase::create(int n_row_, MPI_Comm comm_ptdma_, TDMAType type_) {
         throw std::runtime_error("create(int, MPI_Comm, int, TDMAType) not implemented");
     }
 
@@ -21,13 +21,12 @@ namespace PaScaL_TDMA {
         throw std::runtime_error("create(int, int, MPI_Comm) not implemented");
     }
 
-    void PTDMAPlanSingle::create(int n_row_, MPI_Comm comm_ptdma_, int root_rank_, TDMAType type_) {
+    void PTDMAPlanSingle::create(int n_row_, MPI_Comm comm_ptdma_, TDMAType type_) {
 
         n_row = n_row_;
         MPI_Comm_dup(comm_ptdma_, &comm_ptdma);
         MPI_Comm_size(comm_ptdma, &size);
         MPI_Comm_rank(comm_ptdma, &rank);
-        root_rank = root_rank_;
         type = type_;
 
         int n_row_rd = 2;

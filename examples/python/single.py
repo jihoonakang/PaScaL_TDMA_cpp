@@ -64,7 +64,7 @@ def main(n, type_str):
 
     # Create and solve
     plan = PTDMAPlanSingle()
-    plan.create(n_sub, comm.py2f(), root, is_cyclic)
+    plan.create(n_sub, comm.py2f(), is_cyclic)
     PTDMASolverSingle.solve(plan, a_sub, b_sub, c_sub, d_sub)
     plan.destroy()
 
