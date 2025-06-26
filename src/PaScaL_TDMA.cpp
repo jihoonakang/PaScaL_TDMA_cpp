@@ -343,7 +343,6 @@ namespace PaScaL_TDMA {
     }
 
     void PTDMAPlanManyRHS::create(int n_row_, int n_sys_, MPI_Comm comm_ptdma_, TDMAType type_) {
-
         n_row = n_row_;
         n_sys = n_sys_;
         type = type_;
@@ -361,7 +360,7 @@ namespace PaScaL_TDMA {
         n_row_rt = n_row_rd * size;
 
         MPI_Allgather(&n_sys_rt, 1, MPI_INT, n_sys_rt_array.data(), 1, MPI_INT, comm_ptdma);
-        
+       
         A_rd.resize(n_row_rd);
         B_rd.assign(n_row_rd, 1);
         C_rd.resize(n_row_rd);

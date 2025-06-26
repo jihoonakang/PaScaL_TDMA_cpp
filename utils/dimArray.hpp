@@ -129,8 +129,8 @@ public:
 
     void print2D() const {
         // assert(shape_type == ShapeType::Dim2D);
-        for (int i = 0; i < dim2d_x; ++i) {
-            for (int j = 0; j < dim2d_y; ++j)
+        for (int i = 0; i < dim2d_x; i++) {
+            for (int j = 0; j < dim2d_y; j++)
                 std::cout << (*this)(i, j) << ' ';
             std::cout << '\n';
         }

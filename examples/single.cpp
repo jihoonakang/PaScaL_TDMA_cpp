@@ -75,7 +75,7 @@ int main(int argc, char** argv) {
     std::vector<double> c_sub(n_sub, a_upper);
 
     PTDMAPlanSingle plan;
-    plan.create(n_sub, MPI_COMM_WORLD, root, type);
+    plan.create(n_sub, MPI_COMM_WORLD, type);
     PTDMASolverSingle::solve(plan, a_sub, b_sub, c_sub, d_sub);
     plan.destroy();
 
@@ -84,7 +84,7 @@ int main(int argc, char** argv) {
 
     if (is_root) {
         std::vector<double> error(n);
-        for (int i = 0; i < n; ++i)
+        for (int i = 0; i < n; i++)
             error[i] = d[i] - x[i];
 
         std::cout << "Avg. RMS error = " << sqrt(Util::norm2(error) / n) << std::endl;

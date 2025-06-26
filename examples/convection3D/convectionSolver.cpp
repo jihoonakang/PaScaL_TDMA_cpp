@@ -34,7 +34,7 @@ void ConvectionSolver::solveThetaMany(dimArray<double>& theta,
 
     dimArray<double> rhs(nx_sub + 1, ny_sub + 1, nz_sub + 1);
 
-    for (int time_step = 1; time_step <= Tmax; ++time_step) {
+    for (int time_step = 1; time_step <= Tmax; time_step++) {
         t_curr += dt;
         if (myrank == 0)
             std::cout << "[Main] Current time step = " << time_step << std::endl;
@@ -42,13 +42,13 @@ void ConvectionSolver::solveThetaMany(dimArray<double>& theta,
         // Allocate RHS
         rhs.assign(nx_sub + 1, ny_sub + 1, nz_sub + 1, 0.0);
 
-        for (int i = 1; i < nx_sub; ++i) {
+        for (int i = 1; i < nx_sub; i++) {
             int ip = i + 1, im = i - 1;
-            for (int j = 1; j < ny_sub; ++j) {
+            for (int j = 1; j < ny_sub; j++) {
                 int jp = j + 1, jm = j - 1;
                 int jep = jpbc_index[j], jem = jmbc_index[j];
 
-                for (int k = 1; k < nz_sub; ++k) {
+                for (int k = 1; k < nz_sub; k++) {
                     int kp = k + 1, km = k - 1;
 
                     // Spatial derivatives

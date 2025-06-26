@@ -63,7 +63,7 @@ int main(int argc, char** argv) {
     cudaMemcpy(h_d_out.data(), d_d, N * sizeof(double), cudaMemcpyDeviceToHost);
 
     double error = 0.0;
-    for (int i = 0; i < N; ++i) {
+    for (int i = 0; i < N; i++) {
         error += std::abs(h_d[i] - h_d_out[i]);
     }
 

@@ -55,7 +55,7 @@ class CommLayout3D {
 public:
     CommLayout3D(const int dims_[DIM], const int periods_[DIM]) {
 
-        for (size_t i = 0; i < DIM; ++i) {
+        for (size_t i = 0; i < DIM; i++) {
             dims[i] = dims_[i];
             periods[i] = periods_[i];
         }

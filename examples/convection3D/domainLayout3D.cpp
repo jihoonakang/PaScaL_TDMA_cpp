@@ -179,17 +179,17 @@ void DomainLayout3D::assignMesh(const CommLayout3D& comm,
     const double dy = params.dy;
     const double dz = params.dz;
 
-    for (int i = 0; i <= nx_sub; ++i) {
+    for (int i = 0; i <= nx_sub; i++) {
         x_sub[i] = static_cast<double>(i - 1 + ista - 1) * dx;
         dmx_sub[i] = dx;
     }
 
-    for (int j = 0; j <= ny_sub; ++j) {
+    for (int j = 0; j <= ny_sub; j++) {
         y_sub[j] = static_cast<double>(j + jsta - 1) * dy;
         dmy_sub[j] = dy;
     }
 
-    for (int k = 0; k <= nz_sub; ++k) {
+    for (int k = 0; k <= nz_sub; k++) {
         z_sub[k] = static_cast<double>(k - 1 + ksta - 1) * dz;
         dmz_sub[k] = dz;
     }
@@ -210,9 +210,9 @@ void DomainLayout3D::initializeField(dimArray<double>& theta_sub,
                                      const GlobalParams& params) {
 
     const double PI = GlobalParams::PI;
-    for (int k = 0; k <= nz_sub; ++k) {
-        for (int j = 0; j <= ny_sub; ++j) {
-            for (int i = 0; i <= nx_sub; ++i) {
+    for (int k = 0; k <= nz_sub; k++) {
+        for (int j = 0; j <= ny_sub; j++) {
+            for (int i = 0; i <= nx_sub; i++) {
                 theta_sub(i, j, k) =
                     (params.theta_cold - params.theta_hot) / params.ly * y_sub[j] + params.theta_hot +
                     std::sin(4.0 * PI / params.lx * x_sub[i]) *
@@ -223,13 +223,13 @@ void DomainLayout3D::initializeField(dimArray<double>& theta_sub,
     }
 
     if (topo.getRankY() == 0) {
-        for (int k = 0; k <= nz_sub; ++k) 
-            for (int i = 0; i <= nx_sub; ++i) 
+        for (int k = 0; k <= nz_sub; k++) 
+            for (int i = 0; i <= nx_sub; i++) 
                     theta_sub(i, 0, k) = params.theta_hot;
     }
     if (topo.getRankY() == topo.getSizeY() - 1) {
-        for (int k = 0; k <= nz_sub; ++k) 
-            for (int i = 0; i <= nx_sub; ++i) 
+        for (int k = 0; k <= nz_sub; k++) 
+            for (int i = 0; i <= nx_sub; i++) 
                 theta_sub(i, ny_sub, k) = params.theta_cold;
     }
 }
@@ -239,8 +239,8 @@ void DomainLayout3D::assignBoundaries(const dimArray<double>& theta_sub,
                                       const CommLayout3D& topo,
                                       const GlobalParams& params) {
 
-    for (int k = 0; k <= nz_sub; ++k) {
-        for (int i = 0; i <= nx_sub; ++i) {
+    for (int k = 0; k <= nz_sub; k++) {
+        for (int i = 0; i <= nx_sub; i++) {
             thetaBC3_sub(i, k) = theta_sub(i, 0, k);
             thetaBC4_sub(i, k) = theta_sub(i, ny_sub, k);
         }
@@ -251,8 +251,8 @@ void DomainLayout3D::assignBoundaries(const dimArray<double>& theta_sub,
         // Lower boundary (j = 0 becomes invalid)
         jmbc_index[1] = 0;
 
-        for (int k = 0; k <= nz_sub; ++k)
-                for (int i = 0; i <= nx_sub; ++i)
+        for (int k = 0; k <= nz_sub; k++)
+                for (int i = 0; i <= nx_sub; i++)
                     thetaBC3_sub(i, k) = params.theta_hot;
     }
 
@@ -261,8 +261,8 @@ void DomainLayout3D::assignBoundaries(const dimArray<double>& theta_sub,
         // Upper boundary (j = ny_sub - 1 becomes invalid)
         jpbc_index[ny_sub - 1] = 0;
 
-        for (int k = 0; k <= nz_sub; ++k)
-                for (int i = 0; i <= nx_sub; ++i)
+        for (int k = 0; k <= nz_sub; k++)
+                for (int i = 0; i <= nx_sub; i++)
                     thetaBC4_sub(i, k) = params.theta_cold;
     }
 

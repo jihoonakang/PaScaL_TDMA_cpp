@@ -229,7 +229,7 @@ public:
                        const int n) {
         C[0] /= B[0];
         D[0] /= B[0];
-        for (int i = 1; i < n; ++i) {
+        for (int i = 1; i < n; i++) {
             double m = 1.0 / (B[i] - A[i] * C[i - 1]);
             D[i] = m * (D[i] - A[i] * D[i - 1]);
             C[i] *= m;
@@ -255,7 +255,7 @@ public:
         e[1] /= B[1];
         C[1] /= B[1];
 
-        for (int i = 2; i < n; ++i) {
+        for (int i = 2; i < n; i++) {
             double r = 1.0 / (B[i] - A[i] * C[i - 1]);
             D[i] = r * (D[i] - A[i] * D[i - 1]);
             e[i] = r * (e[i] - A[i] * e[i - 1]);
@@ -270,7 +270,7 @@ public:
         D[0] = (D[0] - A[0] * D[n - 1] - C[0] * D[1]) /
                (B[0] + A[0] * e[n - 1] + C[0] * e[1]);
 
-        for (int i = 1; i < n; ++i) {
+        for (int i = 1; i < n; i++) {
             D[i] += D[0] * e[i];
         }
 
@@ -285,15 +285,15 @@ public:
                      const int n_row, 
                      const int n_sys) {
 
-        for (int j = 0; j < n_sys; ++j) {
+        for (int j = 0; j < n_sys; j++) {
             d[j] /= b[j];
             c[j] /= b[j];
         }
 
-        for (int i = 1; i < n_row; ++i) {
+        for (int i = 1; i < n_row; i++) {
             int idx = i * n_sys;
             int idx_prev = idx - n_sys;
-            for (int j = 0; j < n_sys; ++j) {
+            for (int j = 0; j < n_sys; j++) {
                 double r = 1.0 / (b[idx] - a[idx] * c[idx_prev]);
                 d[idx] = r * (d[idx] - a[idx] * d[idx_prev]);
                 c[idx] = r * c[idx];
@@ -305,7 +305,7 @@ public:
         for (int i = n_row - 2; i >= 0; --i) {
             int idx = i * n_sys;
             int idx_next = idx + n_sys;
-            for (int j = 0; j < n_sys; ++j) {
+            for (int j = 0; j < n_sys; j++) {
                 d[idx] -= c[idx] * d[idx_next];
                 idx++;
                 idx_next++;
@@ -324,21 +324,21 @@ public:
         double* e = new double[n_row * n_sys]();
         double* rr = new double[n_sys];
 
-        for (int j = 0; j < n_sys; ++j) {
+        for (int j = 0; j < n_sys; j++) {
             e[n_sys + j] = -a[n_sys + j];
             e[(n_row - 1) * n_sys + j] = -c[(n_row - 1) * n_sys + j];
         }
 
-        for (int j = 0; j < n_sys; ++j) {
+        for (int j = 0; j < n_sys; j++) {
             d[n_sys + j] /= b[n_sys + j];
             e[n_sys + j] /= b[n_sys + j];
             c[n_sys + j] /= b[n_sys + j];
         }
 
-        for (int i = 2; i < n_row; ++i) {
+        for (int i = 2; i < n_row; i++) {
             int idx = i * n_sys;
             int idx_prev = idx - n_sys;
-            for (int j = 0; j < n_sys; ++j) {
+            for (int j = 0; j < n_sys; j++) {
                 rr[j] = 1.0 / (b[idx] - a[idx] * c[idx_prev]);
                 d[idx] = rr[j] * (d[idx] - a[idx] * d[idx_prev]);
                 e[idx] = rr[j] * (e[idx] - a[idx] * e[idx_prev]);
@@ -351,7 +351,7 @@ public:
         for (int i = n_row - 2; i >= 1; --i) {
             int idx = i * n_sys;
             int idx_next = idx + n_sys;
-            for (int j = 0; j < n_sys; ++j) {
+            for (int j = 0; j < n_sys; j++) {
                 d[idx] -= c[idx] * d[idx_next];
                 e[idx] -= c[idx] * e[idx_next];
                 idx++;
@@ -359,14 +359,14 @@ public:
             }
         }
 
-        for (int j = 0; j < n_sys; ++j) {
+        for (int j = 0; j < n_sys; j++) {
             d[j] = (d[j] - a[j] * d[(n_row - 1) * n_sys + j] - c[j] * d[j + n_sys]) /
                    (b[j] + a[j] * e[(n_row - 1) * n_sys + j] + c[j] * e[j + n_sys]);
         }
 
-        for (int i = 1; i < n_row; ++i) {
+        for (int i = 1; i < n_row; i++) {
             int idx = i * n_sys;
-            for (int j = 0; j < n_sys; ++j) {
+            for (int j = 0; j < n_sys; j++) {
                 d[idx] += d[0 * n_sys + j] * e[idx];
                 idx++;
             }

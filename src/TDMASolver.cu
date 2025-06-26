@@ -37,7 +37,7 @@ __global__ static void cuManyKernel(const double* __restrict__ a,
     c[gid] = c1[tid];
 
     // Forward sweep
-    for (int i = 1; i < nx; ++i) {
+    for (int i = 1; i < nx; i++) {
         c0[tid] = c1[tid];
         d0[tid] = d1[tid];
 
@@ -113,7 +113,7 @@ __global__ static void cuManyCyclicKernel(const double* __restrict__ a,
     double* e1 = e0 + (blockDim.x + 1) * blockDim.y;
 
     // zero e
-    for (int i = 0; i < nx; ++i) {
+    for (int i = 0; i < nx; i++) {
         e[gid + i * stride] = 0.0;
     }
 
@@ -137,7 +137,7 @@ __global__ static void cuManyCyclicKernel(const double* __restrict__ a,
     e[gid] = e1[tid];
 
     // forward sweep
-    for (int i = 2; i < nx; ++i) {
+    for (int i = 2; i < nx; i++) {
         gid += stride;
         c0[tid] = c1[tid];
         d0[tid] = d1[tid];
@@ -191,7 +191,7 @@ __global__ static void cuManyCyclicKernel(const double* __restrict__ a,
     d[gid] = d1[tid];
 
     // apply final correction
-    for (int i = 1; i < nx; ++i) {
+    for (int i = 1; i < nx; i++) {
         gid += stride;
         d[gid] += d1[tid] * e[gid];
     }
@@ -250,7 +250,7 @@ __global__ static void cuManyRHSKernel(const double* __restrict__ a,
 
     d[gid] = d1[tid];
 
-    for (int i = 1; i < nx; ++i) {
+    for (int i = 1; i < nx; i++) {
         d0[tid] = d1[tid];
         gid += stride;
 
@@ -316,7 +316,7 @@ __global__ static void cuManyRHSCyclicKernel(const double* __restrict__ a,
     double* d0 = shared;
     double* d1 = d0 + (blockDim.x + 1) * blockDim.y;
 
-    for (int i = 0; i < nx; ++i)
+    for (int i = 0; i < nx; i++)
         e[i] = 0.0;
 
     e[1]      = -a[1];
@@ -331,7 +331,7 @@ __global__ static void cuManyRHSCyclicKernel(const double* __restrict__ a,
     d[gid] = d1[tid];
 
     // Forward sweep
-    for (int i = 2; i < nx; ++i) {
+    for (int i = 2; i < nx; i++) {
         gid += stride;
         d0[tid] = d1[tid];
 
@@ -370,7 +370,7 @@ __global__ static void cuManyRHSCyclicKernel(const double* __restrict__ a,
     d[gid] = d1[tid];
 
     // Final correction
-    for (int i = 1; i < nx; ++i) {
+    for (int i = 1; i < nx; i++) {
         gid += stride;
         d[gid] += d1[tid] * e[i];
     }

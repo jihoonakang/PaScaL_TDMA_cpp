@@ -98,7 +98,7 @@ TEST(PaScaL_TDMA_many, Solve) {
         for (int j = 0; j < ny_sub; j++)
             d_sub(i, j) = d_sub_tr(j, i);
 
-    for (int i = 0; i < nx_sub; ++i) {
+    for (int i = 0; i < nx_sub; i++) {
         for (int j = 0; j < ny_sub; j++)
             EXPECT_NEAR(d_sub(i, j), x_sub(i, j), tolerance) << 
                 "Mismatch at (i,j) = ( " << i << ", " << j << " )";

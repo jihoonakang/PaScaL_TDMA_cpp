@@ -131,7 +131,7 @@ TEST(PaScaL_TDMA_many, Solve) {
             for (int k = 0; k < nz; k++)
                 d_sub(i, j, k) = d_sub_tr(k, i, j);
 
-    for (int i = 0; i < nx_sub; ++i) {
+    for (int i = 0; i < nx_sub; i++) {
         for (int j = 0; j < ny_sub; j++)
             for (int k = 0; k < nz; k++)
                 EXPECT_NEAR(d_sub(i, j, k), x_sub(i, j, k), tolerance) << 

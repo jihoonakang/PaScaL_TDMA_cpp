@@ -79,10 +79,10 @@ TEST(PaScaL_TDMA_single, Test) {
     std::vector<double> c_sub(n_sub, a_upper);
 
     PTDMAPlanSingle plan;
-    plan.create(n_sub, MPI_COMM_WORLD, root, type);
+    plan.create(n_sub, MPI_COMM_WORLD, type);
     PTDMASolverSingle::solve(plan, a_sub, b_sub, c_sub, d_sub);
 
-    for (int i = 0; i < n_sub; ++i) {
+    for (int i = 0; i < n_sub; i++) {
         EXPECT_NEAR(d_sub[i], x_sub[i], tolerance) << "Mismatch at i = " << i;
     }
 
