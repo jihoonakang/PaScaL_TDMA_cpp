@@ -17,21 +17,17 @@ namespace PaScaL_TDMA {
 
 PYBIND11_MODULE(PaScaL_TDMA_pybind, m){
 
-    m.doc() = "PaScaL_TDMA python plugin";
+    m.doc() = "C++ CPU version of PaScaL_TDMA with NumPy support";
 
-// Binding for a single trigonal system
+    // Binding for a single trigonal system
+    // Plan binding: PTDMAPlanSingle
 
-py::class_<PTDMAPlanSingle>(m, "PTDMAPlanSingle")
+    py::class_<PTDMAPlanSingle>(m, "PTDMAPlanSingle")
         .def(py::init())
         .def("create",
-            [](PTDMAPlanSingle &plan, int n_row_, int comm_ptdma_fhandle_, bool cyclic_){
-                TDMAType type = TDMAType::Standard;
-                if(cyclic_) type = TDMAType::Cyclic;
-
-                plan.create(n_row_, MPI_Comm_f2c(static_cast<MPI_Fint>(comm_ptdma_fhandle_)), type);
-#ifdef DEBUG
-                std::cout << "Plan_single created with pybind." << std::endl;
-#endif
+            [](PTDMAPlanSingle &plan, int n_row_, int comm_fhandle_, bool cyclic_){
+                auto type = cyclic_ ? TDMAType::Cyclic : TDMAType::Standard;
+                plan.create(n_row_, MPI_Comm_f2c(static_cast<MPI_Fint>(comm_fhandle_)), type);
             },
             py::arg("n_row"),
             py::arg("communicator"),
@@ -40,15 +36,52 @@ py::class_<PTDMAPlanSingle>(m, "PTDMAPlanSingle")
         .def("destroy",
             [](PTDMAPlanSingle& plan) {
                 plan.destroy();
-#ifdef DEBUG
-                std::cout << "Plan_single destroyed with pybind." << std::endl;
-#endif
             },
             "Destroy plan_single");
 
-    py::class_<PTDMASolverSingle>(m, "PTDMASolverSingle")
-        .def_static("solve", 
-            [] (PTDMAPlanSingle& plan,
+    // Binding for many trigonal systems
+    // Plan binding: PTDMAPlanMany
+
+    py::class_<PTDMAPlanMany>(m, "PTDMAPlanMany")
+        .def(py::init())
+        .def("create",
+            [](PTDMAPlanMany &plan, int n_row_, int n_sys_, int comm_fhandle_, bool cyclic_){
+                auto type = cyclic_ ? TDMAType::Cyclic : TDMAType::Standard;
+                plan.create(n_row_, n_sys_, MPI_Comm_f2c(static_cast<MPI_Fint>(comm_fhandle_)), type);
+            },
+            py::arg("n_row"),
+            py::arg("n_sys"),
+            py::arg("communicator"),
+            py::arg("cyclic"),
+            "Create plan_many")
+        .def("destroy",
+            [](PTDMAPlanMany& plan) {
+                plan.destroy();
+            },
+            "Destroy plan_many");
+
+    // Binding for a trigonal system with many RHS
+    // Plan binding: PTDMAPlanManyRHS
+
+    py::class_<PTDMAPlanManyRHS>(m, "PTDMAPlanManyRHS")
+        .def(py::init())
+        .def("create",
+            [](PTDMAPlanManyRHS &plan, int n_row_, int n_sys_, int comm_fhandle_, bool cyclic_){
+                auto type = cyclic_ ? TDMAType::Cyclic : TDMAType::Standard;
+                plan.create(n_row_, n_sys_, MPI_Comm_f2c(static_cast<MPI_Fint>(comm_fhandle_)), type);
+            },
+            py::arg("n_row"),
+            py::arg("n_sys"),
+            py::arg("communicator"),
+            py::arg("cyclic"),
+            "Create plan_many_RHS")
+        .def("destroy",
+            &PTDMAPlanManyRHS::destroy,
+            "Destroy plan_many_RHS");
+
+        // Solver function bindings (not classes)
+
+        m.def("solveSingle", [](PTDMAPlanSingle& plan,
                 py::array_t<double, py::array::c_style | py::array::forcecast> A, 
                 py::array_t<double, py::array::c_style | py::array::forcecast> B, 
                 py::array_t<double, py::array::c_style | py::array::forcecast> C, 
@@ -68,37 +101,7 @@ py::class_<PTDMAPlanSingle>(m, "PTDMAPlanSingle")
                 py::arg("D"),
             "Solve a single tridiagonal system");
 
-// Binding for many trigonal systems
-
-    py::class_<PTDMAPlanMany>(m, "PTDMAPlanMany")
-        .def(py::init())
-        .def("create",
-            [](PTDMAPlanMany &plan, int n_row_, int n_sys_, int comm_ptdma_fhandle_, bool cyclic_){
-                TDMAType type = TDMAType::Standard;
-                if(cyclic_) type = TDMAType::Cyclic;
-                
-                plan.create(n_row_, n_sys_, MPI_Comm_f2c(static_cast<MPI_Fint>(comm_ptdma_fhandle_)), type);
-#ifdef DEBUG
-                std::cout << "Plan_many created with pybind." << std::endl;
-#endif
-            },
-            py::arg("n_row"),
-            py::arg("n_sys"),
-            py::arg("communicator"),
-            py::arg("cyclic"),
-            "Create plan_many")
-        .def("destroy",
-            [](PTDMAPlanMany& plan) {
-                plan.destroy();
-#ifdef DEBUG
-                std::cout << "Plan_many destroyed with pybind." << std::endl;
-#endif
-            },
-            "Destroy plan_many");
-
-    py::class_<PTDMASolverMany>(m, "PTDMASolverMany")
-        .def_static("solve", 
-            [] (PTDMAPlanMany& plan,
+        m.def("solveMany", [](PTDMAPlanMany& plan,
                 py::array_t<double, py::array::c_style | py::array::forcecast> A,
                 py::array_t<double, py::array::c_style | py::array::forcecast> B,
                 py::array_t<double, py::array::c_style | py::array::forcecast> C,
@@ -118,31 +121,7 @@ py::class_<PTDMAPlanSingle>(m, "PTDMAPlanSingle")
                 py::arg("D"),
             "Solve many tridiagonal systems");
 
-// Binding for a trigonal system with many RHS
-
-    py::class_<PTDMAPlanManyRHS>(m, "PTDMAPlanManyRHS")
-        .def(py::init())
-        .def("create",
-            [](PTDMAPlanManyRHS &plan, int n_row_, int n_sys_, int comm_ptdma_fhandle_, bool cyclic_){
-                TDMAType type = TDMAType::Standard;
-                if(cyclic_) type = TDMAType::Cyclic;
-                plan.create(n_row_, n_sys_, MPI_Comm_f2c(static_cast<MPI_Fint>(comm_ptdma_fhandle_)), type);
-#ifdef DEBUG
-                std::cout << "Plan_many_RHS created with pybind." << std::endl;
-#endif
-            },
-            py::arg("n_row"),
-            py::arg("n_sys"),
-            py::arg("communicator"),
-            py::arg("cyclic"),
-            "Create plan_many_RHS")
-        .def("destroy",
-            &PTDMAPlanManyRHS::destroy,
-            "Destroy plan_many_RHS");
-
-    py::class_<PTDMASolverManyRHS>(m, "PTDMASolverManyRHS")
-        .def_static("solve", 
-            [] (PTDMAPlanManyRHS& plan,
+    m.def("solveManyRHS", [] (PTDMAPlanManyRHS& plan,
                 py::array_t<double, py::array::c_style | py::array::forcecast> A,
                 py::array_t<double, py::array::c_style | py::array::forcecast> B,
                 py::array_t<double, py::array::c_style | py::array::forcecast> C,

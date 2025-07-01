@@ -14,20 +14,21 @@ root = 0
 
 def generate_3d_rhs(a, b, c, nx, ny, nz, tdma_type):
     X = cp.random.rand(nx, ny, nz)
+    # X = np.full((nx, ny, nz), 1.0)
     D = np.zeros((nx, ny, nz))
 
     for k in range(nz):
         for j in range(ny):  # 열을 기준으로 반복
             if tdma_type == 'cyclic':
-                D[0, j, k] = a[0, j, k] * X[-1, j, k] + b[0, j, k] * X[0, j, k] + c[0, j, k] * X[1, j, k]
+                D[0, j, k] = a[0] * X[-1, j, k] + b[0] * X[0, j, k] + c[0] * X[1, j, k]
                 for i in range(1, nx - 1):
-                    D[i, j, k] = a[i, j, k] * X[i - 1, j, k] + b[i, j, k] * X[i, j, k] + c[i, j, k] * X[i + 1, j, k]
-                D[-1, j, k] = a[-1, j, k] * X[-2, j, k] + b[-1, j, k] * X[-1, j, k] + c[-1, j, k] * X[0, j, k]
+                    D[i, j, k] = a[i] * X[i - 1, j, k] + b[i] * X[i, j, k] + c[i] * X[i + 1, j, k]
+                D[-1, j, k] = a[-1] * X[-2, j, k] + b[-1] * X[-1, j, k] + c[-1] * X[0, j, k]
             elif tdma_type == 'standard':
-                D[0, j, k] = b[0, j, k] * X[0, j, k] + c[0, j, k] * X[1, j, k]
+                D[0, j, k] = b[0] * X[0, j, k] + c[0] * X[1, j, k]
                 for i in range(1, nx - 1):
-                    D[i, j, k] = a[i, j, k] * X[i - 1, j, k] + b[i, j, k] * X[i, j, k] + c[i, j, k] * X[i + 1, j, k]
-                D[-1, j, k] = a[-1, j, k] * X[-2, j, k] + b[-1, j, k] * X[-1, j, k]
+                    D[i, j, k] = a[i] * X[i - 1, j, k] + b[i] * X[i, j, k] + c[i] * X[i + 1, j, k]
+                D[-1, j, k] = a[-1] * X[-2, j, k] + b[-1] * X[-1, j, k]
             else:
                 raise ValueError("Invalid TDMA type. Use 'standard' or 'cyclic'")
     return D, X
@@ -42,9 +43,9 @@ def main(nx, ny, nz, type_str):
         raise ValueError("Invalid TDMA type. Use 'standard' or 'cyclic'")
     is_cyclic = (type_str == "cyclic")
 
-    a = np.full((nx, ny, nz), a_lower)
-    b = np.full((nx, ny, nz), a_diag)
-    c = np.full((nx, ny, nz), a_upper)
+    a = np.full(nx, a_lower)
+    b = np.full(nx, a_diag)
+    c = np.full(nx, a_upper)
 
     D, X = generate_3d_rhs(a, b, c, nx, ny, nz, type_str)
 
@@ -55,15 +56,15 @@ def main(nx, ny, nz, type_str):
 
     comm = MPI.COMM_WORLD
 
-    plan = Tdma.PTDMAPlanMany()
+    plan = Tdma.PTDMAPlanManyRHS()
     plan.create(nx, ny * nz, comm.py2f(), cyclic=is_cyclic)
-    Tdma.solveMany(plan, a, b, c, D.reshape(nx, -1))
+    Tdma.solveManyRHS(plan, a, b, c, D.reshape(nx, -1))
     plan.destroy()
 
 
-    plan = cuTdma.cuPTDMAPlanMany()
+    plan = cuTdma.cuPTDMAPlanManyRHS()
     plan.create(nx, ny, nz, comm.py2f(), cyclic=is_cyclic)
-    cuTdma.cuSolveMany(plan, a_gpu, b_gpu, c_gpu, D_gpu)
+    cuTdma.cuSolveManyRHS(plan, a_gpu, b_gpu, c_gpu, D_gpu)
     plan.destroy()
 
     D_gpu_result = cp.asnumpy(D_gpu)

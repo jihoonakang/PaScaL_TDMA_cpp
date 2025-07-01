@@ -1,6 +1,6 @@
 import numpy as np
 from mpi4py import MPI
-from PaScaL_TDMA_pybind import PTDMAPlanManyRHS, PTDMASolverManyRHS
+import PaScaL_TDMA_pybind as Tdma
 
 a_diag = 10.0
 a_upper = -1.0
@@ -65,12 +65,12 @@ def main(nx, ny, type_str):
     comm.Scatterv([X, counts_col, displs_col, MPI.DOUBLE], x_sub, root)
 
     # # Solve 각 row independently
-    plan = PTDMAPlanManyRHS()
+    plan = Tdma.PTDMAPlanManyRHS()
     plan.create(nx_sub, ny, comm.py2f(), is_cyclic)
     a = np.full(nx_sub, a_lower)
     b = np.full(nx_sub, a_diag)
     c = np.full(nx_sub, a_upper)
-    PTDMASolverManyRHS.solve(plan, a, b, c, d_sub)
+    Tdma.solveManyRHS(plan, a, b, c, d_sub)
     plan.destroy()
 
     # Gather solved D
