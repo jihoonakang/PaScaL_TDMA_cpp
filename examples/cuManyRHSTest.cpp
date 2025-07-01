@@ -20,19 +20,19 @@ int main(int argc, char** argv) {
     std::vector<double> h_c(nx, -1.0);
     std::vector<double> h_d(N);
 
-    // for (int i = 0; i < N; i++) {
-    //     h_d[i] = std::sin(i);
-    // }
-
-    for (int j = 0; j < ny * nz; j++)
-            h_d[j] = 2.0;
-    for (int i = ny * nz; i < (nx - 1) * ny * nz; i += ny * nz) {
-        for (int j = 0; j < ny * nz; j++)
-            h_d[i + j] = 2.0;
+    for (int i = 0; i < N; i++) {
+        h_d[i] = std::sin(i);
     }
-    int i = (nx - 1) * ny * nz;
-    for (int j = 0; j < ny * nz; j++)
-        h_d[i + j] = 2.0;
+
+    // for (int j = 0; j < ny * nz; j++)
+    //         h_d[j] = 2.0;
+    // for (int i = ny * nz; i < (nx - 1) * ny * nz; i += ny * nz) {
+    //     for (int j = 0; j < ny * nz; j++)
+    //         h_d[i + j] = 2.0;
+    // }
+    // int i = (nx - 1) * ny * nz;
+    // for (int j = 0; j < ny * nz; j++)
+    //     h_d[i + j] = 2.0;
 
     std::vector<double> h_d_ref = h_d;
 
@@ -44,9 +44,9 @@ int main(int argc, char** argv) {
     cudaEnv::initialize();
 
     if (cudaEnv::isCudaAwareMPI()) {
-        std::cout << "[INFO] CUDA-Aware MPI is available." << std::endl;
+        if (!rank) std::cout << "[INFO] CUDA-Aware MPI is available." << std::endl;
     } else {
-        std::cout << "[INFO] CUDA-Aware MPI is NOT available." << std::endl;
+        if (!rank) std::cout << "[INFO] CUDA-Aware MPI is NOT available." << std::endl;
     }
 
     // GPU 메모리 할당

@@ -18,18 +18,23 @@ public:
         int device_count = 0;
         cudaError_t err = cudaGetDeviceCount(&device_count);
         if (err != cudaSuccess || device_count == 0) {
-            fprintf(stderr, "[ERROR] No CUDA-compatible GPU device found.\n");
+            if (!rank) {
+                fprintf(stderr, "[ERROR] No CUDA-compatible GPU device found.\n");
+                fprintf(stderr, "[ERROR] Build with -DCUDA=OFF.\n");
+            }
             MPI_Abort(MPI_COMM_WORLD, -1);
             exit(EXIT_FAILURE);
         }
 
         // 디바이스 정보 출력
-        printf("[INFO] %d CUDA device(s) found:\n", device_count);
+        if (!rank) printf("[INFO] %d CUDA device(s) found:\n", device_count);
         for (int i = 0; i < device_count; ++i) {
             cudaDeviceProp prop;
             cudaGetDeviceProperties(&prop, i);
-            printf("  - Device %d: %s | Compute Capability: %d.%d | Global Mem: %.2f GB\n",
+            if (!rank) {
+                printf("  - Device %d: %s | Compute Capability: %d.%d | Global Mem: %.2f GB\n",
                    i, prop.name, prop.major, prop.minor, prop.totalGlobalMem / (1024.0 * 1024.0 * 1024.0));
+            }
         }
 
         // 2. CUDA-Aware MPI 테스트 via Bcast
@@ -40,8 +45,9 @@ public:
         int result = MPI_Bcast(gpu_buf, buf_size, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
         if (result != MPI_SUCCESS) {
-            if (rank == 0) {
-                fprintf(stderr, "[WARNING] CUDA-Aware MPI not supported. Falling back to host memory.\n");
+            if (!rank) {
+                fprintf(stderr, "[ERROR] CUDA-Aware MPI not supported.\n");
+                fprintf(stderr, "[ERROR] Build with -DCUDA_AWARE_MPI=OFF.\n");
             }
             cudaAwareMPI = false;
         }
@@ -62,8 +68,9 @@ public:
                                   MPI_COMM_WORLD);
 
         if (result != MPI_SUCCESS) {
-            if (rank == 0) {
-                fprintf(stderr, "[WARNING] CUDA-Aware MPI not supported (MPI_Alltoall failed on GPU memory).\n");
+            if (!rank) {
+                fprintf(stderr, "[ERROR] CUDA-Aware MPI not supported (MPI_Alltoall failed on GPU memory).\n");
+                fprintf(stderr, "[ERROR] Build with -DCUDA_AWARE_MPI=OFF.\n");
             }
             cudaAwareMPI = false;
         }

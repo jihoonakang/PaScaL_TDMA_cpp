@@ -484,7 +484,6 @@ namespace cuPaScaL_TDMA {
         cudaMalloc((void**)&d_c_rt, sizeof(double) * n_row_rt * n_sys_rt);
         cudaMalloc((void**)&d_d_rt, sizeof(double) * n_row_rt * n_sys_rt);
 
-
         threads         = dim3(8, 8, 1);
 
         int ny_block = ny_sys / threads.x;
@@ -581,16 +580,16 @@ namespace cuPaScaL_TDMA {
         cuManyModifiedThomasMany<<<plan.blocks, plan.threads, shmem_size>>>
             (A, B, C, D, plan.d_a_rd, plan.d_c_rd, plan.d_d_rd, n_row, ny_sys, nz_sys);
 
-        transpose_slab_yz_to_xy(plan, plan.d_a_rd, plan.d_a_rt);
-        transpose_slab_yz_to_xy(plan, plan.d_c_rd, plan.d_c_rt);
-        transpose_slab_yz_to_xy(plan, plan.d_d_rd, plan.d_d_rt);
+        transposeSlabYZtoXY(plan, plan.d_a_rd, plan.d_a_rt);
+        transposeSlabYZtoXY(plan, plan.d_c_rd, plan.d_c_rt);
+        transposeSlabYZtoXY(plan, plan.d_d_rd, plan.d_d_rt);
 
         cuDispatchTDMASolver<BatchType::Many>(plan.type,
                                             plan.d_a_rt, plan.d_b_rt,
                                             plan.d_c_rt, plan.d_d_rt,
                                             plan.n_row_rt, plan.ny_sys, plan.nz_sys_rt);
 
-        transpose_slab_xy_to_yz(plan, plan.d_d_rt, plan.d_d_rd);
+        transposeSlabXYtoYZ(plan, plan.d_d_rt, plan.d_d_rd);
 
         shmem_size = 2 * (plan.threads.x + 1) * plan.threads.y * sizeof(double);
         cuReconstructMany<<<plan.blocks, plan.threads, shmem_size>>>
@@ -599,88 +598,99 @@ namespace cuPaScaL_TDMA {
         cudaDeviceSynchronize();
     }
 
-    void cuPTDMASolverMany::transpose_slab_xy_to_yz(const cuPTDMAPlanMany& p,
+    void cuPTDMASolverMany::transposeSlabXYtoYZ(const cuPTDMAPlanMany& p,
                                                     const double* slab_xy,
                                                     double* slab_yz) {
 
         int blksize = p.n_row_rd * p.n_sys / p.size;
         size_t buffer_size = sizeof(double) * p.n_row_rd * p.n_sys;
-
         double* recvbuf_dev;
-        double* sendbuf_host;
-        double* recvbuf_host;
 
         // GPU memory allocation
         cudaMalloc((void**)&recvbuf_dev, buffer_size);
+
+#ifdef USE_CUDA_AWARE_MPI
+        int ierr = MPI_Alltoall(slab_xy, blksize, MPI_DOUBLE,
+                                recvbuf_dev, blksize, MPI_DOUBLE,
+                                p.comm_ptdma);
+        assert(ierr == MPI_SUCCESS);
+#else
+        double* sendbuf_host;
+        double* recvbuf_host;
 
         // Host (pinned) memory allocation
         cudaMallocHost((void**)&sendbuf_host, buffer_size);
         cudaMallocHost((void**)&recvbuf_host, buffer_size);
 
-        // Step 2: Device → Host copy. Detach x-y slab to device buffer is not required.
+        // Device -> Host copy. Detach x-y slab to device buffer is not required.
         cudaMemcpy(sendbuf_host, slab_xy, buffer_size, cudaMemcpyDeviceToHost);
 
-        // Step 3: MPI Alltoall on host
+        // MPI Alltoall on host
         int ierr = MPI_Alltoall(sendbuf_host, blksize, MPI_DOUBLE,
                                 recvbuf_host, blksize, MPI_DOUBLE,
                                 p.comm_ptdma);
         assert(ierr == MPI_SUCCESS);
 
-        // Step 4: Host → Device copy
+        // Host -> Device copy
         cudaMemcpy(recvbuf_dev, recvbuf_host, buffer_size, cudaMemcpyHostToDevice);
 
-        // Step 5: Reconstruct y-z slab from device buffer
+        cudaFreeHost(sendbuf_host);
+        cudaFreeHost(recvbuf_host);
+#endif
+        // Reconstruct y-z slab from device buffer
         mem_unite_slab_yz<<<p.blocks_alltoall, p.threads>>>(
             recvbuf_dev, slab_yz, p.n_row_rd, p.ny_sys, p.nz_sys, p.size);
         cudaDeviceSynchronize();
 
-        // Cleanup
         cudaFree(recvbuf_dev);
-        cudaFreeHost(sendbuf_host);
-        cudaFreeHost(recvbuf_host);
     }
 
     // Transpose slab from y-z to x-z direction
-    void cuPTDMASolverMany::transpose_slab_yz_to_xy(const cuPTDMAPlanMany& p,
+    void cuPTDMASolverMany::transposeSlabYZtoXY(const cuPTDMAPlanMany& p,
                                 const double* slab_yz,
                                 double* slab_xy) {
 
         int blksize = p.n_row_rd * p.n_sys / p.size;
         size_t buffer_size = sizeof(double) * p.n_row_rd * p.n_sys;
 
-        // GPU → Host로 중간 버퍼 설정
         double* sendbuf_dev;
-        double* sendbuf_host;
-        double* recvbuf_host;
 
         // Allocate GPU memory
         cudaMalloc((void**)&sendbuf_dev, buffer_size);
+
+        // Detach y-z slab to 1D buffer (device memory)
+        mem_detach_slab_yz<<<p.blocks_alltoall, p.threads>>>(
+            slab_yz, sendbuf_dev, p.n_row_rd, p.ny_sys, p.nz_sys, p.size);
+        cudaDeviceSynchronize();
+
+#ifdef USE_CUDA_AWARE_MPI
+        int ierr = MPI_Alltoall(sendbuf_dev, blksize, MPI_DOUBLE,
+                                slab_xy, blksize, MPI_DOUBLE,
+                                p.comm_ptdma);
+        assert(ierr == MPI_SUCCESS);
+#else
+        double* sendbuf_host;
+        double* recvbuf_host;
 
         // Allocate host memory (pinned memory for performance)
         cudaMallocHost((void**)&sendbuf_host, buffer_size);
         cudaMallocHost((void**)&recvbuf_host, buffer_size);
 
-        // Step 1: Detach y-z slab to 1D buffer (device memory)
-        mem_detach_slab_yz<<<p.blocks_alltoall, p.threads>>>(
-            slab_yz, sendbuf_dev, p.n_row_rd, p.ny_sys, p.nz_sys, p.size);
-        cudaDeviceSynchronize();
+        // Copy device -> host
+        cudaMemcpy(sendbuf_host, sendbuf_dev, buffer_size, cudaMemcpyDeviceToHost);
 
-        // Step 2: Copy device → host
-        cudaError_t err = cudaMemcpy(sendbuf_host, sendbuf_dev, buffer_size, cudaMemcpyDeviceToHost);
-
-        // Step 3: MPI Alltoall on host
+        // MPI Alltoall on host
         int ierr = MPI_Alltoall(sendbuf_host, blksize, MPI_DOUBLE,
                                 recvbuf_host, blksize, MPI_DOUBLE,
                                 p.comm_ptdma);
         assert(ierr == MPI_SUCCESS);
-
-        // Step 4: Copy host → device. Reconstruct x-y slab from device memory is not required
+        // Copy host -> device. Reconstruct x-y slab from device memory is not required
         cudaMemcpy(slab_xy, recvbuf_host, buffer_size, cudaMemcpyHostToDevice);
 
-        // Clean up
-        cudaFree(sendbuf_dev);
         cudaFreeHost(sendbuf_host);
         cudaFreeHost(recvbuf_host);
+#endif
+        cudaFree(sendbuf_dev);
     }
 
     // ManyRHS
@@ -824,14 +834,14 @@ namespace cuPaScaL_TDMA {
                       plan.d_c_rt, n_row_rd, MPI_DOUBLE,
                       plan.comm_ptdma);
 
-        transpose_slab_yz_to_xy(plan, plan.d_d_rd, plan.d_d_rt);
+        transposeSlabYZtoXY(plan, plan.d_d_rd, plan.d_d_rt);
 
         cuDispatchTDMASolver<BatchType::ManyRHS>(plan.type,
                                             plan.d_a_rt, plan.d_b_rt,
                                             plan.d_c_rt, plan.d_d_rt,
                                             plan.n_row_rt, plan.ny_sys, plan.nz_sys_rt);
 
-        transpose_slab_xy_to_yz(plan, plan.d_d_rt, plan.d_d_rd);
+        transposeSlabXYtoYZ(plan, plan.d_d_rt, plan.d_d_rd);
 
         shmem_size = 2 * (plan.threads.x + 1) * plan.threads.y * sizeof(double);
         cuReconstructManyRHS<<<plan.blocks, plan.threads, shmem_size>>>
@@ -840,88 +850,100 @@ namespace cuPaScaL_TDMA {
         cudaDeviceSynchronize();
     }
 
-    void cuPTDMASolverManyRHS::transpose_slab_xy_to_yz(const cuPTDMAPlanManyRHS& p,
+    void cuPTDMASolverManyRHS::transposeSlabXYtoYZ(const cuPTDMAPlanManyRHS& p,
                                                     const double* slab_xy,
                                                     double* slab_yz) {
 
         int blksize = p.n_row_rd * p.n_sys / p.size;
         size_t buffer_size = sizeof(double) * p.n_row_rd * p.n_sys;
-
         double* recvbuf_dev;
-        double* sendbuf_host;
-        double* recvbuf_host;
 
         // GPU memory allocation
         cudaMalloc((void**)&recvbuf_dev, buffer_size);
+
+#ifdef USE_CUDA_AWARE_MPI
+        int ierr = MPI_Alltoall(slab_xy, blksize, MPI_DOUBLE,
+                                recvbuf_dev, blksize, MPI_DOUBLE,
+                                p.comm_ptdma);
+        assert(ierr == MPI_SUCCESS);
+#else
+        double* sendbuf_host;
+        double* recvbuf_host;
 
         // Host (pinned) memory allocation
         cudaMallocHost((void**)&sendbuf_host, buffer_size);
         cudaMallocHost((void**)&recvbuf_host, buffer_size);
 
-        // Step 2: Device → Host copy. Detach x-y slab to device buffer is not required.
+        // Device -> Host copy. Detach x-y slab to device buffer is not required.
         cudaMemcpy(sendbuf_host, slab_xy, buffer_size, cudaMemcpyDeviceToHost);
 
-        // Step 3: MPI Alltoall on host
+        // MPI Alltoall on host
         int ierr = MPI_Alltoall(sendbuf_host, blksize, MPI_DOUBLE,
                                 recvbuf_host, blksize, MPI_DOUBLE,
                                 p.comm_ptdma);
         assert(ierr == MPI_SUCCESS);
 
-        // Step 4: Host → Device copy
+        // Host -> Device copy
         cudaMemcpy(recvbuf_dev, recvbuf_host, buffer_size, cudaMemcpyHostToDevice);
 
-        // Step 5: Reconstruct y-z slab from device buffer
+        cudaFreeHost(sendbuf_host);
+        cudaFreeHost(recvbuf_host);
+#endif
+        // Reconstruct y-z slab from device buffer
         mem_unite_slab_yz<<<p.blocks_alltoall, p.threads>>>(
             recvbuf_dev, slab_yz, p.n_row_rd, p.ny_sys, p.nz_sys, p.size);
         cudaDeviceSynchronize();
 
-        // Cleanup
         cudaFree(recvbuf_dev);
-        cudaFreeHost(sendbuf_host);
-        cudaFreeHost(recvbuf_host);
     }
 
     // Transpose slab from y-z to x-z direction
-    void cuPTDMASolverManyRHS::transpose_slab_yz_to_xy(const cuPTDMAPlanManyRHS& p,
+    void cuPTDMASolverManyRHS::transposeSlabYZtoXY(const cuPTDMAPlanManyRHS& p,
                                 const double* slab_yz,
                                 double* slab_xy) {
 
         int blksize = p.n_row_rd * p.n_sys / p.size;
         size_t buffer_size = sizeof(double) * p.n_row_rd * p.n_sys;
 
-        // GPU → Host로 중간 버퍼 설정
         double* sendbuf_dev;
-        double* sendbuf_host;
-        double* recvbuf_host;
 
         // Allocate GPU memory
         cudaMalloc((void**)&sendbuf_dev, buffer_size);
+
+        // Detach y-z slab to 1D buffer (device memory)
+        mem_detach_slab_yz<<<p.blocks_alltoall, p.threads>>>(
+            slab_yz, sendbuf_dev, p.n_row_rd, p.ny_sys, p.nz_sys, p.size);
+        cudaDeviceSynchronize();
+
+#ifdef USE_CUDA_AWARE_MPI
+        int ierr = MPI_Alltoall(sendbuf_dev, blksize, MPI_DOUBLE,
+                                slab_xy, blksize, MPI_DOUBLE,
+                                p.comm_ptdma);
+        assert(ierr == MPI_SUCCESS);
+#else
+        double* sendbuf_host;
+        double* recvbuf_host;
 
         // Allocate host memory (pinned memory for performance)
         cudaMallocHost((void**)&sendbuf_host, buffer_size);
         cudaMallocHost((void**)&recvbuf_host, buffer_size);
 
-        // Step 1: Detach y-z slab to 1D buffer (device memory)
-        mem_detach_slab_yz<<<p.blocks_alltoall, p.threads>>>(
-            slab_yz, sendbuf_dev, p.n_row_rd, p.ny_sys, p.nz_sys, p.size);
-        cudaDeviceSynchronize();
+        // Copy device → host
+        cudaMemcpy(sendbuf_host, sendbuf_dev, buffer_size, cudaMemcpyDeviceToHost);
 
-        // Step 2: Copy device → host
-        cudaError_t err = cudaMemcpy(sendbuf_host, sendbuf_dev, buffer_size, cudaMemcpyDeviceToHost);
-
-        // Step 3: MPI Alltoall on host
+        // MPI Alltoall on host
         int ierr = MPI_Alltoall(sendbuf_host, blksize, MPI_DOUBLE,
                                 recvbuf_host, blksize, MPI_DOUBLE,
                                 p.comm_ptdma);
         assert(ierr == MPI_SUCCESS);
 
-        // Step 4: Copy host → device. Reconstruct x-y slab from device memory is not required
+        // Copy host -> device. Reconstruct x-y slab from device memory is not required
         cudaMemcpy(slab_xy, recvbuf_host, buffer_size, cudaMemcpyHostToDevice);
 
-        // Clean up
-        cudaFree(sendbuf_dev);
         cudaFreeHost(sendbuf_host);
         cudaFreeHost(recvbuf_host);
+#endif
+        cudaFree(sendbuf_dev);
     }
 
     //================================

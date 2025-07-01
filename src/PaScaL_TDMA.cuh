@@ -75,10 +75,10 @@ namespace cuPaScaL_TDMA {
 
     class cuPTDMASolverMany {
     public:
-        static void transpose_slab_yz_to_xy(const cuPTDMAPlanMany& plan,
+        static void transposeSlabYZtoXY(const cuPTDMAPlanMany& plan,
                                 const double* slab_yz,
                                 double* slab_xy);
-        static void transpose_slab_xy_to_yz(const cuPTDMAPlanMany& plan,
+        static void transposeSlabXYtoYZ(const cuPTDMAPlanMany& plan,
                                 const double* slab_xy,
                                 double* slab_yz);
         static void cuSolve(cuPTDMAPlanMany& plan,
@@ -126,10 +126,10 @@ namespace cuPaScaL_TDMA {
 
     class cuPTDMASolverManyRHS {
     public:
-        static void transpose_slab_yz_to_xy(const cuPTDMAPlanManyRHS& plan,
+        static void transposeSlabYZtoXY(const cuPTDMAPlanManyRHS& plan,
                                 const double* slab_yz,
                                 double* slab_xy);
-        static void transpose_slab_xy_to_yz(const cuPTDMAPlanManyRHS& plan,
+        static void transposeSlabXYtoYZ(const cuPTDMAPlanManyRHS& plan,
                                 const double* slab_xy,
                                 double* slab_yz);
         static void allGather(const cuPTDMAPlanManyRHS& plan, 

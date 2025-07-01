@@ -2,10 +2,9 @@
 #include <vector>
 #include <cmath>
 #include <cuda_runtime.h>
-#include "TDMASolver.hpp"
-#include "TDMASolver.cuh"
 #include "PaScaL_TDMA.cuh"
 #include "PaScaL_TDMA.hpp"
+#include "cudaEnv.hpp"
 
 int main(int argc, char** argv) {
 
@@ -20,6 +19,14 @@ int main(int argc, char** argv) {
     std::vector<double> h_b(N,  4.0);
     std::vector<double> h_c(N, -1.0);
     std::vector<double> h_d(N);
+
+    cudaEnv::initialize();
+
+    if (cudaEnv::isCudaAwareMPI()) {
+        if (!rank) std::cout << "[INFO] CUDA-Aware MPI is available." << std::endl;
+    } else {
+        if (!rank) std::cout << "[INFO] CUDA-Aware MPI is NOT available." << std::endl;
+    }
 
     for (int i = 0; i < N; i++) {
         h_d[i] = std::sin(i);

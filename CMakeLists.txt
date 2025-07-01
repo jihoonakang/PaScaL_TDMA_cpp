@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.19)
 
-option(CUDA "Enable GPU (CUDA) support" OFF)
+option(CUDA "Enable GPU (CUDA) support" ON)
+option(CUDA_AWARE_MPI "Enable CUDA-Aware MPI support" ON)
 option(TESTING "Enable building and running tests" ON)
 option(PYTHON "Enable Python bindings using pybind11" on)
 
@@ -34,7 +35,6 @@ if(CUDA)
     include_directories(${CUDA_INCLUDE_DIRS})
     target_compile_definitions(PaScaL_TDMA PRIVATE CUDA)
     message(STATUS "GPU support ENABLED (CUDA)")
-    message(STATUS "CUDA_INCLUDE_DIRS: ${CUDA_INCLUDE_DIRS}")
 else()
     message(STATUS "GPU support DISABLED")
 endif()
