@@ -9,9 +9,9 @@ option(PYTHON "Enable Python bindings using pybind11" on)
 
 # 2. Project declaration based on CUDA support
 if(CUDA)
-    project(PaScaL_TDMA_CPP LANGUAGES CXX CUDA)
+    project(PaScaL_TDMA LANGUAGES CXX CUDA)
 else()
-    project(PaScaL_TDMA_CPP LANGUAGES CXX)
+    project(PaScaL_TDMA LANGUAGES CXX)
 endif()
 
 # 3. Language standards and required packages
@@ -22,7 +22,12 @@ find_package(MPI REQUIRED)
 # 4. Global compile options (optimization, debug)
 add_compile_options(-O2 -DDEBUG)
 
-# 5. CUDA-specific configuration
+# 5. Add source and example subdirectories
+add_subdirectory(src)
+add_subdirectory(examples)
+add_subdirectory(examples/convection3D)
+
+# 6. CUDA-specific configuration
 if(CUDA)
     enable_language(CUDA)
     set(CMAKE_CUDA_STANDARD 17)
@@ -40,11 +45,6 @@ if(CUDA)
 else()
     message(STATUS "GPU support: DISABLED")
 endif()
-
-# 6. Add source and example subdirectories
-add_subdirectory(src)
-add_subdirectory(examples)
-add_subdirectory(examples/convection3D)
 
 # 7. Testing framework
 if(TESTING)
