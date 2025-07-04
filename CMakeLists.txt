@@ -59,5 +59,8 @@ endif()
 # Python binding
 if(PYTHON)
     add_subdirectory(src/pybind)
+    message(STATUS "Python binding ENABLED")
+else()
+    message(STATUS "Python binding DISABLED")
 endif()
 
