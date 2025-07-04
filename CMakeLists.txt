@@ -35,6 +35,13 @@ if(CUDA)
     include_directories(${CUDA_INCLUDE_DIRS})
     target_compile_definitions(PaScaL_TDMA PRIVATE CUDA)
     message(STATUS "GPU support ENABLED (CUDA)")
+
+    if(CUDA_AWARE_MPI)
+        message(STATUS "CUDA_AWARE_MPI ENALBED (CUDA)")
+    else()
+        message(STATUS "CUDA_AWARE_MPI DISABLED")
+    endif()
+
 else()
     message(STATUS "GPU support DISABLED")
 endif()

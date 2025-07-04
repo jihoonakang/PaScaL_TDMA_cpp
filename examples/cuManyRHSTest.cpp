@@ -24,23 +24,6 @@ int main(int argc, char** argv) {
         h_d[i] = std::sin(i);
     }
 
-    // for (int j = 0; j < ny * nz; j++)
-    //         h_d[j] = 2.0;
-    // for (int i = ny * nz; i < (nx - 1) * ny * nz; i += ny * nz) {
-    //     for (int j = 0; j < ny * nz; j++)
-    //         h_d[i + j] = 2.0;
-    // }
-    // int i = (nx - 1) * ny * nz;
-    // for (int j = 0; j < ny * nz; j++)
-    //     h_d[i + j] = 2.0;
-
-    std::vector<double> h_d_ref = h_d;
-
-    // for (int i = 0; i < nx * ny * nz; i+=ny*nz) {
-    //     for (int j = 0; j < ny*nz; j++) std::cout << h_d_ref[i+j] << ' ';
-    //     std::cout<<std::endl;
-    // }
-
     cudaEnv::initialize();
 
     if (cudaEnv::isCudaAwareMPI()) {
@@ -64,7 +47,7 @@ int main(int argc, char** argv) {
     // CPU 참조 해 계산
     PaScaL_TDMA::PTDMAPlanManyRHS px_many;
     px_many.create(nx, ny * nz, MPI_COMM_WORLD, PaScaL_TDMA::TDMAType::Cyclic);
-    PaScaL_TDMA::PTDMASolverManyRHS::solve(px_many, h_a, h_b, h_c, h_d_ref);
+    PaScaL_TDMA::PTDMASolverManyRHS::solve(px_many, h_a, h_b, h_c, h_d);
     px_many.destroy();
 
     // 커널 호출
@@ -77,14 +60,9 @@ int main(int argc, char** argv) {
     std::vector<double> h_d_out(N);
     cudaMemcpy(h_d_out.data(), d_d, N * sizeof(double), cudaMemcpyDeviceToHost);
 
-    // for (int i = 0; i < nx * ny * nz; i+=ny*nz) {
-    //     for (int j = 0; j < ny*nz; j++) std::cout << h_d_out[i+j] << ' ';
-    //     std::cout<<std::endl;
-    // }
-
     double error = 0.0;
     for (int i = 0; i < N; i++) {
-        error += std::abs(h_d_ref[i] - h_d_out[i]);
+        error += std::abs(h_d[i] - h_d_out[i]);
     }
     if (rank == 0)
         std::cout << "Total error: " << error << std::endl;

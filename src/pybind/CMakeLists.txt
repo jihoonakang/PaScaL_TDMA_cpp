@@ -42,11 +42,8 @@ add_custom_command(TARGET PaScaL_TDMA_pybind POST_BUILD
 if(CUDA)
     enable_language(CUDA)
 
-    # pybind11_add_module(PaScaL_TDMA_cuda_pybind
-    #     cupyBinding.cpp
-    #     ${CMAKE_SOURCE_DIR}/src/PaScaL_TDMA.cu
-    #     ${CMAKE_SOURCE_DIR}/src/TDMASolver.cu
-    # )
+    # pybind11_add_module can't handle .cu files in cases.
+    # Instead, We use add_library for CUDA support.
     add_library(PaScaL_TDMA_cuda_pybind MODULE
         cupyBinding.cpp
         ${CMAKE_SOURCE_DIR}/src/PaScaL_TDMA.cu

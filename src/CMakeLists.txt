@@ -29,7 +29,4 @@ if(CUDA)
     if(CUDA_AWARE_MPI)
         target_compile_definitions(PaScaL_TDMA PRIVATE USE_CUDA_AWARE_MPI=1)
     endif()
-
-    message(STATUS "CUDA flags: ${CUDA}")
-    message(STATUS "CUDA_AWARE_MPI flags: ${CUDA_AWARE_MPI}")
 endif()
