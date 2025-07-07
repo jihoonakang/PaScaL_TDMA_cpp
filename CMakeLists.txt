@@ -20,7 +20,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(MPI REQUIRED)
 
 # 4. Global compile options (optimization, debug)
-add_compile_options(-O2 -DDEBUG)
+#add_compile_options(-O2 -DDEBUG)
+add_compile_options(-O2)
 
 # 5. Add source and example subdirectories
 add_subdirectory(src)

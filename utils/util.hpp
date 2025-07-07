@@ -7,9 +7,10 @@
 */
 
 #pragma once
-#include <cmath>
-#include <algorithm>
-#include <vector>
+
+#include <algorithm> /**< For std::min */
+#include <cmath>     /**< For std::sqrt */
+#include <vector>    /**< For std::vector */
 
 namespace Util { 
 

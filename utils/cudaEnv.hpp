@@ -1,3 +1,10 @@
+/**
+ * @file cudaEnv.hpp
+ * @brief Initializes CUDA environment and verifies CUDA-Aware MPI support.
+ *
+ * Provides functions to check GPU availability, display device information,
+ * and test CUDA-Aware MPI via MPI_Bcast and MPI_Alltoall operations.
+ */
 #pragma once
 
 #include <mpi.h>
@@ -5,72 +12,91 @@
 #include <cstdio>
 #include <cstdlib>
 
+/**
+ * @class cudaEnv
+ * @brief Manages CUDA environment setup and CUDA-Aware MPI detection.
+ *
+ * All methods are static since the environment is global across MPI processes.
+ */
 class cudaEnv {
 public:
-    // 초기화 함수: GPU 검사 + CUDA-aware MPI 확인
+    /**
+     * @brief Initialize CUDA and test MPI support.
+     *
+     * Performs the following steps:
+     *   1. Detect CUDA-compatible GPU devices.
+     *   2. Print device properties for the root MPI rank.
+     *   3. Test CUDA-Aware MPI support via MPI_Bcast on GPU memory.
+     *   4. Test CUDA-Aware MPI support via MPI_Alltoall on GPU memory.
+     *
+     * Aborts MPI if no GPU devices are found. Sets internal flag
+     * to false if MPI operations on GPU memory fail.
+     */
     static void initialize() {
 
-        int rank, size;
+        int rank = 0;           ///< MPI rank of the current process
+        int size = 1;           ///< Total number of MPI ranks
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
         MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-        // 1. GPU 디바이스 확인
-        int device_count = 0;
+        // 1. GPU device detection
+        int device_count = 0;   ///< Number of CUDA-compatible devices
         cudaError_t err = cudaGetDeviceCount(&device_count);
         if (err != cudaSuccess || device_count == 0) {
             if (!rank) {
-                fprintf(stderr, "[ERROR] No CUDA-compatible GPU device found.\n");
-                fprintf(stderr, "[ERROR] Build with -DCUDA=OFF.\n");
+                std::fprintf(stderr, "[ERROR] No GPU (CUDA) device found.\n");
+                std::fprintf(stderr, "[ERROR] Build with -DCUDA=OFF.\n");
             }
             MPI_Abort(MPI_COMM_WORLD, -1);
             exit(EXIT_FAILURE);
         }
 
-        // 디바이스 정보 출력
+        // 2. Print GPU device properties on root rank
         if (!rank) printf("[INFO] %d CUDA device(s) found:\n", device_count);
         for (int i = 0; i < device_count; ++i) {
             cudaDeviceProp prop;
             cudaGetDeviceProperties(&prop, i);
             if (!rank) {
-                printf("  - Device %d: %s | Compute Capability: %d.%d | Global Mem: %.2f GB\n",
-                   i, prop.name, prop.major, prop.minor, prop.totalGlobalMem / (1024.0 * 1024.0 * 1024.0));
+                std::printf("  - Device %d: %s | Compute Capability: %d.%d | "
+                            "Global Mem: %.2f GB\n",
+                            i, prop.name, prop.major, prop.minor, 
+                            prop.totalGlobalMem / (1024.0 * 1024.0 * 1024.0));
             }
         }
 
-        // 2. CUDA-Aware MPI 테스트 via Bcast
-        int buf_size = 10;
-        double* gpu_buf = nullptr;
-        cudaMalloc(&gpu_buf, sizeof(double) * buf_size);
+        // 3. Test CUDA-Aware MPI via MPI_Bcast
+        double* gpu_buf = nullptr;      ///< Device buffer for MPI_Bcast
+        cudaMalloc(&gpu_buf, sizeof(double) * 10);
 
-        int result = MPI_Bcast(gpu_buf, buf_size, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+        int result = MPI_Bcast(gpu_buf, 10, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
         if (result != MPI_SUCCESS) {
             if (!rank) {
-                fprintf(stderr, "[ERROR] CUDA-Aware MPI not supported.\n");
-                fprintf(stderr, "[ERROR] Build with -DCUDA_AWARE_MPI=OFF.\n");
+                std::fprintf(stderr, "[ERROR] CUDA-Aware MPI not supported.");
+                std::fprintf(stderr, "[ERROR] MPI_Bcast failed on GPU mem.");
+                std::fprintf(stderr, "[ERROR] Build with -DCUDA_AWARE_MPI=OFF");
             }
             cudaAwareMPI = false;
         }
 
         cudaFree(gpu_buf);
 
-        // 3. CUDA-Aware MPI 테스트 via Alltoall
-        double* sendbuf = nullptr;
-        double* recvbuf = nullptr;
-        size_t count_per_rank = 1;
+        // 4. Test CUDA-Aware MPI via MPI_Alltoall
+        double* sendbuf = nullptr;      ///< Device send buffer for Alltoall
+        double* recvbuf = nullptr;      ///< Device receive buffer for Alltoall
 
-        cudaMalloc(&sendbuf, size * count_per_rank * sizeof(double));
-        cudaMalloc(&recvbuf, size * count_per_rank * sizeof(double));
+        cudaMalloc(&sendbuf, size * sizeof(double));
+        cudaMalloc(&recvbuf, size * sizeof(double));
 
-        // Alltoall: 모든 랭크가 GPU 버퍼에서 서로 데이터 교환
-        result = MPI_Alltoall(sendbuf, count_per_rank, MPI_DOUBLE,
-                                  recvbuf, count_per_rank, MPI_DOUBLE,
+        result = MPI_Alltoall(sendbuf, 1, MPI_DOUBLE,
+                                  recvbuf, 1, MPI_DOUBLE,
                                   MPI_COMM_WORLD);
 
         if (result != MPI_SUCCESS) {
             if (!rank) {
-                fprintf(stderr, "[ERROR] CUDA-Aware MPI not supported (MPI_Alltoall failed on GPU memory).\n");
-                fprintf(stderr, "[ERROR] Build with -DCUDA_AWARE_MPI=OFF.\n");
+                std::fprintf(stderr, "[ERROR] CUDA-Aware MPI not supported.");
+                std::fprintf(stderr, "[ERROR] MPI_Alltoall failed on GPU mem.");
+                std::fprintf(stderr, "[ERROR] Build with -DCUDA_AWARE_MPI=OFF");
             }
             cudaAwareMPI = false;
         }
@@ -79,11 +105,12 @@ public:
         cudaFree(recvbuf);
     }
 
-    // CUDA-aware MPI 지원 여부 확인
+    /// Returns true if CUDA-Aware MPI support was detected.
     static bool isCudaAwareMPI() {
         return cudaAwareMPI;
     }
 
 private:
+    /// Flag indicating if CUDA-Aware MPI is supported.
     static inline bool cudaAwareMPI = true;
 };
