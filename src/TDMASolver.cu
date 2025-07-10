@@ -1,22 +1,45 @@
+/**
+ * @file TDMASolver.cu
+ * @brief CUDA implementations for cuTDMASolver methods using custom kernels.
+ */
+
 #include <cuda_runtime.h>
 #include <cassert>
 #include "TDMASolver.cuh"
 
+/**
+ * @brief Kernel to solve many independent tridiagonal systems in parallel.
+ *
+ * Each thread handles one system identified by (j,k) in the 2D grid of systems.
+ * Shared memory buffers store intermediate coefficients for forward/backward sweeps.
+ *
+ * @param a Lower-diagonal array (device pointer).
+ * @param b Diagonal array.
+ * @param c Upper-diagonal array (in/out).
+ * @param d Right-hand side array (in/out).
+ * @param nx Number of rows per system.
+ * @param ny Number of systems in Y dimension.
+ * @param nz Number of systems in Z dimension.
+ */
 __global__ static void cuManyKernel(const double* __restrict__ a,
                                     const double* __restrict__ b,
                                     double* __restrict__ c,
                                     double* __restrict__ d,
                                     int nx, int ny, int nz) {
-    // Global (j,k) index
+
+    // Compute global system indices
     int j = blockIdx.y * blockDim.y + threadIdx.y;
     int k = blockIdx.x * blockDim.x + threadIdx.x;
     if (j >= ny || k >= nz) return;
     int gid = k + j * nz;
+    const int stride = ny * nz;
 
+    // Local thread ID with padding for shared memory
     int tj = threadIdx.y;
     int tk = threadIdx.x;
     int tid = tk + tj * (blockDim.x + 1);
 
+    // Shared memory layout: a1,b1,c0,c1,d0,d1 buffers per thread
     extern __shared__ double shared[];
     double* a1 = shared;
     double* b1 = a1 + (blockDim.x + 1) * blockDim.y;
@@ -25,7 +48,7 @@ __global__ static void cuManyKernel(const double* __restrict__ a,
     double* d0 = c1 + (blockDim.x + 1) * blockDim.y;
     double* d1 = d0 + (blockDim.x + 1) * blockDim.y;
 
-    // 초기화
+    // --- Initialization using shared memory: first row
     b1[tid] = b[gid];
     c1[tid] = c[gid];
     d1[tid] = d[gid];
@@ -33,75 +56,108 @@ __global__ static void cuManyKernel(const double* __restrict__ a,
     d1[tid] /= b1[tid];
     c1[tid] /= b1[tid];
 
+    // Write back initial values to global memory
     d[gid] = d1[tid];
     c[gid] = c1[tid];
 
-    // Forward sweep
+    // --- Forward elimination for rows 1..nx-1
     for (int i = 1; i < nx; i++) {
+        // Shift buffers
         c0[tid] = c1[tid];
         d0[tid] = d1[tid];
 
-        gid += ny * nz;
+        // Load next row elements
+        gid += stride;             ///< move to next row in device arrays
         a1[tid] = a[gid];
         b1[tid] = b[gid];
         c1[tid] = c[gid];
         d1[tid] = d[gid];
 
+        // Compute on shared memory
         double r = 1.0 / (b1[tid] - a1[tid] * c0[tid]);
         d1[tid] = r * (d1[tid] - a1[tid] * d0[tid]);
         c1[tid] = r * c1[tid];
 
+        // Write back elimination results to global memory
         d[gid] = d1[tid];
         c[gid] = c1[tid];
     }
 
-    // Backward sweep
+    // --- Backward substitution
     for (int i = nx - 2; i >= 0; --i) {
-        gid -= ny * nz;
+        // Load previous row elements
+        gid -= stride;             ///< move back to previous row
         c0[tid] = c[gid];
         d0[tid] = d[gid];
 
+        // Compute on shared memory
         d0[tid] = d0[tid] - c0[tid] * d1[tid];
         d1[tid] = d0[tid];
+
+        // Write back substitution results to global memory
         d[gid] = d0[tid];
     }
 }
 
-void cuTDMASolver::cuMany(const double* a_d, const double* b_d, double* c_d, double* d_d,
-            int nx, int ny, int nz, cudaStream_t stream) {
+/**
+ * @brief Host wrapper launching cuManyKernel.
+ *
+ * Configures thread blocks, shared memory size, and synchronizes.
+ */
+void cuTDMASolver::cuMany(const double* a_d, const double* b_d, 
+                          double* c_d, double* d_d,
+                          int nx, int ny, int nz, 
+                          cudaStream_t stream) noexcept {
 
-        assert(nz > 1 && ny > 0 && nx > 0);
+    assert(nz > 1 && ny > 0 && nx > 0);
 
-        dim3 threads(8, 8);
-        dim3 blocks((nz + threads.x - 1) / threads.x,
-                    (ny + threads.y - 1) / threads.y);
+    // Launch configuration
+    dim3 threads(8, 8);
+    dim3 blocks((nz + threads.x - 1) / threads.x,
+                (ny + threads.y - 1) / threads.y);
 
-        int sys_size = (threads.x + 1)* threads.y;
-        size_t shmem = 6 * sys_size * sizeof(double); 
+    int sys_size = (threads.x + 1)* threads.y; // +1 padding for bank conflict
+    size_t shmem = 6 * sys_size * sizeof(double); 
 
-        cuManyKernel<<<blocks, threads, shmem, stream>>>(
-            a_d, b_d, c_d, d_d, nx, ny, nz );
-        cudaDeviceSynchronize();
+    // Kernel launch
+    cuManyKernel<<<blocks, threads, shmem, stream>>>(
+        a_d, b_d, c_d, d_d, nx, ny, nz );
+
 }
 
+/**
+ * @brief Kernel for cyclic tridiagonal systems, including correction vector e.
+ *
+ * Each thread handles one system identified by (j,k) in the 2D grid of systems.
+ * Shared memory buffers store intermediate coefficients for forward/backward sweeps.
+ *
+ * @param a Lower-diagonal array (device pointer).
+ * @param b Diagonal array.
+ * @param c Upper-diagonal array (in/out).
+ * @param d Right-hand side array (in/out).
+ * @param nx Number of rows per system.
+ * @param ny Number of systems in Y dimension.
+ * @param nz Number of systems in Z dimension.
+ */
 __global__ static void cuManyCyclicKernel(const double* __restrict__ a,
                                           const double* __restrict__ b,
                                           double* __restrict__ c,
                                           double* __restrict__ d,
                                           double* __restrict__ e,
                                           int nx, int ny, int nz) {
-    // Global (j,k) index
+    // Compute global system indices
     int j = blockIdx.y * blockDim.y + threadIdx.y;
     int k = blockIdx.x * blockDim.x + threadIdx.x;
     if (j >= ny || k >= nz) return;
+    int gid = j * nz + k;
+    const int stride = ny * nz;
 
+    // Local thread ID with padding for shared memory
     int tj = threadIdx.y;
     int tk = threadIdx.x;
     int tid = tk + tj * (blockDim.x + 1);
 
-    const int stride = ny * nz;
-    int gid = j * nz + k;
-
+    // Shared memory layout: a1,b1,c0,c1,d0,d1,e0,e1 buffers per thread
     extern __shared__ double shared[];
     double* a1 = shared;
     double* b1 = a1 + (blockDim.x + 1) * blockDim.y;
@@ -117,11 +173,11 @@ __global__ static void cuManyCyclicKernel(const double* __restrict__ a,
         e[gid + i * stride] = 0.0;
     }
 
-    // initialize e[2], e[nz]
+    // initialize e[2], e[nx]
     e[gid + stride] = -a[gid + stride];
     e[gid + (nx - 1) * stride] = -c[gid + (nx - 1) * stride];
 
-    // step 1
+    // --- Initialization using shared memory: first row
     gid += stride;
     d1[tid] = d[gid];
     b1[tid] = b[gid];
@@ -132,51 +188,59 @@ __global__ static void cuManyCyclicKernel(const double* __restrict__ a,
     c1[tid] /= b1[tid];
     e1[tid] /= b1[tid];
 
+    // Write back initial values to global memory
     d[gid] = d1[tid];
     c[gid] = c1[tid];
     e[gid] = e1[tid];
 
-    // forward sweep
+    // --- Forward elimination for rows 1..nx-1
     for (int i = 2; i < nx; i++) {
-        gid += stride;
+        // Shift buffers
         c0[tid] = c1[tid];
         d0[tid] = d1[tid];
         e0[tid] = e1[tid];
 
+        // Load next row elements
+        gid += stride;          ///< move to next row in device arrays
         a1[tid] = a[gid];
         b1[tid] = b[gid];
         c1[tid] = c[gid];
         d1[tid] = d[gid];
         e1[tid] = e[gid];
 
+        // Compute on shared memory
         double r = 1.0 / (b1[tid] - a1[tid] * c0[tid]);
         d1[tid] = r * (d1[tid] - a1[tid] * d0[tid]);
         e1[tid] = r * (e1[tid] - a1[tid] * e0[tid]);
         c1[tid] = r * c1[tid];
 
+        // Write back elimination results to global memory
         d[gid] = d1[tid];
         c[gid] = c1[tid];
         e[gid] = e1[tid];
     }
 
-    // backward sweep
+    // --- Backward substitution
     for (int i = nx - 2; i >= 1; --i) {
-        gid -= stride;
+        // Load previous row elements
+        gid -= stride;              ///< move back to previous row
         c0[tid] = c[gid];
         d0[tid] = d[gid];
         e0[tid] = e[gid];
 
+        // Compute on shared memory
         d0[tid] -= c0[tid] * d1[tid];
         e0[tid] -= c0[tid] * e1[tid];
 
         d1[tid] = d0[tid];
         e1[tid] = e0[tid];
 
+        // Write back substitution results to global memory
         d[gid] = d0[tid];
         e[gid] = e0[tid];
     }
 
-    // final correction step (i=1)
+    // Final correction step (i=0)
     gid -= stride;
     double a_1 = a[gid];
     double b_1 = b[gid];
@@ -190,96 +254,139 @@ __global__ static void cuManyCyclicKernel(const double* __restrict__ a,
     d1[tid] = numerator / denominator;
     d[gid] = d1[tid];
 
-    // apply final correction
+    // Apply final correction
     for (int i = 1; i < nx; i++) {
         gid += stride;
         d[gid] += d1[tid] * e[gid];
     }
 }
 
-void cuTDMASolver::cuManyCyclic(const double* a_d, const double* b_d, double* c_d, double* d_d,
-                  int nx, int ny, int nz, cudaStream_t stream) {
+/**
+ * @brief Host wrapper launching cuManyCyclicKernel.
+ *
+ * Configures thread blocks, shared memory size, and synchronizes.
+ */
+void cuTDMASolver::cuManyCyclic(const double* a_d, const double* b_d, 
+                                double* c_d, double* d_d,
+                                int nx, int ny, int nz, 
+                                cudaStream_t stream) noexcept {
 
     assert(nz > 1 && ny > 0 && nx > 0);
     double *e_d;
     cudaMalloc(&e_d, nx * ny * nz * sizeof(double));
 
+    // Launch configuration
     dim3 threads(8, 8);
     dim3 blocks((nz + threads.x - 1) / threads.x,
                 (ny + threads.y - 1) / threads.y);
 
-    int sys_size = (threads.x + 1)* threads.y;
+    int sys_size = (threads.x + 1)* threads.y; // +1 padding for bank conflict
     size_t shmem = 8 * sys_size * sizeof(double); 
 
+    // Kernel launch
     cuManyCyclicKernel<<<blocks, threads, shmem, stream>>>(
         a_d, b_d, c_d, d_d, e_d, nx, ny, nz);
 
-    cudaDeviceSynchronize();
     cudaFree(e_d);
 }
 
+/**
+ * @brief Kernel to solve batched systems with common diagonals.
+ *
+ * Each thread handles one system identified by (j,k) in the 2D grid of systems.
+ * Shared memory buffers store intermediate coefficients for forward/backward sweeps.
+ *
+ * @param a Lower-diagonal array (device pointer).
+ * @param b Diagonal array.
+ * @param c Upper-diagonal array (in/out).
+ * @param d Right-hand side array (in/out).
+ * @param nx Number of rows per system.
+ * @param ny Number of systems in Y dimension.
+ * @param nz Number of systems in Z dimension.
+ */
 __global__ static void cuManyRHSKernel(const double* __restrict__ a,
                                        const double* __restrict__ b,
                                        double* __restrict__ c,
                                        double* __restrict__ d,
                                        int nx, int ny, int nz) {
-    // Global index for (j, k)
+    // Compute global system indices
     int j = blockIdx.y * blockDim.y + threadIdx.y;
     int k = blockIdx.x * blockDim.x + threadIdx.x;
     if (j >= ny || k >= nz) return;
     int gid = k + j * nz; 
-
     const int stride = ny * nz;
-    double c_local[256]; //Solving race condition. TODO: memory problem
-    for (int i = 0; i < nx; i++) c_local[i] = c[i];
-    
-    extern __shared__ double shared[];
-    double* d0 = shared;
-    double* d1 = d0 + (blockDim.x + 1) * blockDim.y;
 
+    // Local thread ID with padding for shared memory
     int tj = threadIdx.y;
     int tk = threadIdx.x;
     int tid = tk + tj * (blockDim.x + 1);
 
-    // Forward sweep
+    // Local register for solving race condition. TODO: memory problem
+    double c_local[256];    /// Local register 
+    for (int i = 0; i < nx; i++) c_local[i] = c[i];
+    
+    // Shared memory layout: d0,d1 buffers per thread
+    extern __shared__ double shared[];
+    double* d0 = shared;
+    double* d1 = d0 + (blockDim.x + 1) * blockDim.y;
+
+    // --- Initialization using shared memory: first row
     double b1 = b[0];
     d1[tid] = d[gid];
 
     d1[tid] /= b1;
     c_local[0] /= b1;
 
+    // Write back initial values to global memory
     d[gid] = d1[tid];
 
+    // --- Forward elimination for rows 1..nx-1
     for (int i = 1; i < nx; i++) {
+        // Shift buffers
         d0[tid] = d1[tid];
-        gid += stride;
 
-        double a1 = a[i];
+        // Load next row elements
+        gid += stride;
         d1[tid] = d[gid];
 
+        // Compute on shared memory
+        double a1 = a[i];
         double r = 1.0 / (b[i] - a1 * c_local[i-1]);
         d1[tid] = r * (d1[tid] - a1 * d0[tid]);
-
         c_local[i] *= r;
+
+        // Write back elimination results to global memory
         d[gid] = d1[tid];
     }
 
-    // Backward sweep
+    // --- Backward substitution
     for (int i = nx - 2; i >= 0; --i) {
-        gid -= stride;
+        // Load previous row elements
+        gid -= stride;              ///< move back to previous row
         d0[tid] = d[gid];
+
+        // Compute on shared memory
         d0[tid] -= c_local[i] * d1[tid];
         d1[tid] = d0[tid];
+
+        // Write back substitution results to global memory
         d[gid] = d0[tid];
     }
 }
 
+/**
+ * @brief Host wrapper launching cuManyRHSKernel.
+ *
+ * Configures thread blocks, shared memory size, and synchronizes.
+ */
 void cuTDMASolver::cuManyRHS(const double* a_d, const double* b_d,
                              double* c_d, double* d_d,
                              int nx, int ny, int nz,
-                             cudaStream_t stream) {
+                             cudaStream_t stream) noexcept {
+
     assert(nx > 1 && ny > 0 && nz > 0);
 
+    // Launch configuration
     dim3 threads(8, 8);
     dim3 blocks((nz + threads.x - 1) / threads.x,
                 (ny + threads.y - 1) / threads.y);
@@ -287,77 +394,109 @@ void cuTDMASolver::cuManyRHS(const double* a_d, const double* b_d,
     int sys_size = (threads.x + 1) * threads.y;  // +1 padding for bank conflict
     size_t shmem = 2 * sys_size * sizeof(double);
 
+    // Kernel launch
     cuManyRHSKernel<<<blocks, threads, shmem, stream>>>(
-        a_d, b_d, c_d, d_d, nx, ny, nz
-    );
+        a_d, b_d, c_d, d_d, nx, ny, nz);
 
-    cudaDeviceSynchronize();
 }
 
+/**
+ * @brief Kernel to solve cyclic batched systems with common diagonals.
+ *
+ * Each thread handles one system identified by (j,k) in the 2D grid of systems.
+ * Shared memory buffers store intermediate coefficients for forward/backward sweeps.
+ *
+ * @param a Lower-diagonal array (device pointer).
+ * @param b Diagonal array.
+ * @param c Upper-diagonal array (in/out).
+ * @param d Right-hand side array (in/out).
+ * @param nx Number of rows per system.
+ * @param ny Number of systems in Y dimension.
+ * @param nz Number of systems in Z dimension.
+ */
 __global__ static void cuManyRHSCyclicKernel(const double* __restrict__ a,
                                              const double* __restrict__ b,
                                              double* __restrict__ c,
                                              double* __restrict__ d,
                                              int nx, int ny, int nz) {
+    // Compute global system indices
     int j = blockIdx.y * blockDim.y + threadIdx.y;
     int k = blockIdx.x * blockDim.x + threadIdx.x;
     if (j >= ny || k >= nz) return;
     int gid = j * nz + k;
+    const int stride = ny * nz;
 
+    // Local thread ID with padding for shared memory
     int tj = threadIdx.y;
     int tk = threadIdx.x;
     int tid = tk + tj * (blockDim.x + 1);
-    const int stride = ny * nz;
 
-    double c_local[256], e[256]; //Solving race condition. TODO: memory problem
+    // Local register for solving race condition. TODO: memory problem
+    double c_local[256], e[256];
     for (int i = 0; i < nx; i++) c_local[i] = c[i];
 
+    // Shared memory layout: d0,d1 buffers per thread
     extern __shared__ double shared[];
     double* d0 = shared;
     double* d1 = d0 + (blockDim.x + 1) * blockDim.y;
 
+    // zero e
     for (int i = 0; i < nx; i++)
         e[i] = 0.0;
 
+    // initialize e[2], e[nx]
     e[1]      = -a[1];
     e[nx - 1] = -c_local[nx - 1];
 
+    // --- Initialization using shared memory: first row
     gid += stride;
     double b1 = b[1];
     d1[tid] = d[gid];
     d1[tid] /= b1;
     c_local[1] /= b1;
     e[1] /= b1;
+
+    // Write back initial values to global memory
     d[gid] = d1[tid];
 
-    // Forward sweep
+    // --- Forward elimination for rows 1..nx-1
     for (int i = 2; i < nx; i++) {
-        gid += stride;
+        // Shift buffers
         d0[tid] = d1[tid];
 
+        // Load next row elements
         double a1 = a[i];
         b1 = b[i];
+        gid += stride;          ///< move to next row in device arrays
         d1[tid] = d[gid];
 
+        // Compute on shared memory
         double r = 1.0 / (b1 - a1 * c_local[i - 1]);
         d1[tid] = r * (d1[tid] - a1 * d0[tid]);
         e[i] = r * (e[i] - a1 * e[i - 1]);
         c_local[i] = r * c_local[i];
+
+        // Write back elimination results to global memory
         d[gid] = d1[tid];
     }
 
-    // Backward sweep
+    // --- Backward substitution
     for (int i = nx - 2; i >= 1; --i) {
-        gid -= stride;
+        // Load previous row elements
+        gid -= stride;              ///< move back to previous row
         double c_i = c_local[i];
         d0[tid] = d[gid];
+
+        // Compute on shared memory
         d0[tid] -= c_i * d1[tid];
         e[i] -= c_i * e[i + 1];
         d1[tid] = d0[tid];
+
+        // Write back substitution results to global memory
         d[gid] = d0[tid];
     }
 
-    // Correction step (i = 0)
+    // Final correction step (i=0)
     gid -= stride;
     double a0 = a[0];
     double b0 = b[0];
@@ -369,28 +508,32 @@ __global__ static void cuManyRHSCyclicKernel(const double* __restrict__ a,
     d1[tid] = numerator / denominator;
     d[gid] = d1[tid];
 
-    // Final correction
+    // Apply final correction
     for (int i = 1; i < nx; i++) {
         gid += stride;
         d[gid] += d1[tid] * e[i];
     }
 }
 
+/**
+ * @brief Host wrapper launching cuManyRHSCyclicKernel.
+ *
+ * Configures thread blocks, shared memory size, and synchronizes.
+ */
 void cuTDMASolver::cuManyRHSCyclic(const double* a_d, const double* b_d, double* c_d,
                                    double* d_d, int nx, int ny, int nz,
-                                   cudaStream_t stream) {
+                                   cudaStream_t stream) noexcept {
     assert(nx > 2 && ny > 0 && nz > 0);
 
-    // Allocate e (correction vector, same shape as d)
+    // Launch configuration
     dim3 threads(8, 8);
     dim3 blocks((nz + threads.x - 1) / threads.x,
                 (ny + threads.y - 1) / threads.y);
 
-    int sys_size = (threads.x + 1) * threads.y;
-    size_t shmem = 2 * sys_size * sizeof(double);  // c0, c1, d0, d1, e0, e1
+    int sys_size = (threads.x + 1) * threads.y; // +1 padding for bank conflict
+    size_t shmem = 2 * sys_size * sizeof(double);  // d0, d1
 
+    // Kernel launch
     cuManyRHSCyclicKernel<<<blocks, threads, shmem, stream>>>(
         a_d, b_d, c_d, d_d, nx, ny, nz);
-
-    cudaDeviceSynchronize();  // for development
 }

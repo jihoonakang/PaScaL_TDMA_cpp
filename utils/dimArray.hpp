@@ -24,12 +24,13 @@ enum class ShapeType { None, Dim2D, Dim3D };    ///< Dimensionality of the array
  */
 template <class T>
 class dimArray {
+
+private:
     std::vector<T> data_;                           /**< Contiguous data buf */
     ShapeType shape_type_ = ShapeType::None;        /**< Current shape */
     int dim2d_x_ = 0, dim2d_y_ = 0;                 /**< Size of 2D shape */
     int dim3d_x_ = 0, dim3d_y_ = 0, dim3d_z_ = 0;   /**< Size of 3D shape */
 
-public:
 public:
     /// Default constructor initializes an empty array.
     dimArray() noexcept = default;

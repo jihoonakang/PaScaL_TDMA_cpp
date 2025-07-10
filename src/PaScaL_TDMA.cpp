@@ -1,3 +1,11 @@
+/**
+ * @file PaScaL_TDMA.cpp
+ * @brief Implementation of planner and solver dispatch for PaScaL_TDMA library.
+ *
+ * Contains definitions of PTDMAPlanBase, PTDMAPlanSingle/Many/ManyRHS,
+ * solver methods, and batch solver templates.
+ */
+
 #include <vector>
 #include <mpi.h>
 #include <iostream>
@@ -9,571 +17,663 @@
 
 namespace PaScaL_TDMA {
 
+    /**
+     * @brief Default create throws; must be overridden by derived plans.
+     */
     void PTDMAPlanBase::create(int n_row_, MPI_Comm comm_ptdma_, TDMAType type_) {
-        throw std::runtime_error("create(int, MPI_Comm, int, TDMAType) not implemented");
+        throw std::runtime_error("create(int, MPI_Comm, TDMAType) not implemented");
     }
 
     void PTDMAPlanBase::create(int n_row_, int n_sys_, MPI_Comm comm_ptdma_, TDMAType type_) {
         throw std::runtime_error("create(int, int, MPI_Comm, TDMAType) not implemented");
     }
 
-    void PTDMAPlanBase::create(int n_row_, int n_sys_, MPI_Comm comm_ptdma_) {
-        throw std::runtime_error("create(int, int, MPI_Comm) not implemented");
-    }
+    /**
+     * @brief Create plan for single system across ranks.
+     */
+    void PTDMAPlanSingle::create(int n_row, MPI_Comm comm_ptdma, TDMAType type) {
 
-    void PTDMAPlanSingle::create(int n_row_, MPI_Comm comm_ptdma_, TDMAType type_) {
+        n_row_ = n_row;
+        MPI_Comm_dup(comm_ptdma, &comm_ptdma_);
+        MPI_Comm_size(comm_ptdma_, &size_);
+        MPI_Comm_rank(comm_ptdma_, &rank_);
+        type_ = type;
 
-        n_row = n_row_;
-        MPI_Comm_dup(comm_ptdma_, &comm_ptdma);
-        MPI_Comm_size(comm_ptdma, &size);
-        MPI_Comm_rank(comm_ptdma, &rank);
-        type = type_;
-
+        // two boundary rows
         int n_row_rd = 2;
-        n_row_rt = n_row_rd * size;
+        n_row_rt_ = n_row_rd * size_;
 
-        A_rd.resize(n_row_rd);
-        B_rd.assign(n_row_rd, 1.0);
-        C_rd.resize(n_row_rd);
-        D_rd.resize(n_row_rd);
+        // resize buffers for reduced and transposed system
+        a_rd_.resize(n_row_rd);
+        b_rd_.assign(n_row_rd, 1.0);
+        c_rd_.resize(n_row_rd);
+        d_rd_.resize(n_row_rd);
 
-        A_rt.resize(n_row_rt);
-        B_rt.assign(n_row_rt, 1.0);
-        C_rt.resize(n_row_rt);
-        D_rt.resize(n_row_rt);
+        a_rt_.resize(n_row_rt_);
+        b_rt_.assign(n_row_rt_, 1.0);
+        c_rt_.resize(n_row_rt_);
+        d_rt_.resize(n_row_rt_);
     }
 
+    /**
+     * @brief Destroy plan, clear buffers.
+     */
     void PTDMAPlanSingle::destroy() {
 
-        A_rd.clear();
-        B_rd.clear();
-        C_rd.clear();
-        D_rd.clear();
+        a_rd_.clear();
+        b_rd_.clear();
+        c_rd_.clear();
+        d_rd_.clear();
 
-        A_rt.clear();
-        B_rt.clear();
-        C_rt.clear();
-        D_rt.clear();
+        a_rt_.clear();
+        b_rt_.clear();
+        c_rt_.clear();
+        d_rt_.clear();
     }
 
-    static void forwardSingle(double* A, const double* B, double* C, double* D, 
-                             const int n_row) {
+    /**
+     * @brief Forward elimination for single-system TDMA.
+     */
+    static void forwardSingle(double* a, const double* b, double* c, double* d, 
+                              int n_row) {
 
         double r;
 
-        A[0] /= B[0]; D[0] /= B[0]; C[0] /= B[0];
-        A[1] /= B[1]; D[1] /= B[1]; C[1] /= B[1];
+        a[0] /= b[0]; d[0] /= b[0]; c[0] /= b[0];
+        a[1] /= b[1]; d[1] /= b[1]; c[1] /= b[1];
 
         for (int i = 2; i < n_row; i++) {
-            r = 1.0 / (B[i] - A[i] * C[i - 1]);
-            D[i] = r * (D[i] - A[i] * D[i - 1]);
-            C[i] = r * C[i];
-            A[i] = -r * A[i] * A[i - 1];
+            r = 1.0 / (b[i] - a[i] * c[i - 1]);
+            d[i] = r * (d[i] - a[i] * d[i - 1]);
+            c[i] = r * c[i];
+            a[i] = -r * a[i] * a[i - 1];
         }
     }
 
-    static void backwardSingle(double* A, double* C, double* D, 
-                               const int n_row) {
+    /**
+     * @brief Backward substitution for single-system TDMA.
+     */
+    static void backwardSingle(double* a, double* c, double* d, int n_row) {
 
         for (int i = n_row - 3; i >= 1; i--) {
-            D[i] -= C[i] * D[i + 1];
-            A[i] -= C[i] * A[i + 1];
-            C[i] = -C[i] * C[i + 1];
+            d[i] -= c[i] * d[i + 1];
+            a[i] -= c[i] * a[i + 1];
+            c[i] = -c[i] * c[i + 1];
         }
 
-        double r = 1.0 / (1.0 - A[1] * C[0]);
-        D[0] = r * (D[0] - C[0] * D[1]);
-        A[0] = r * A[0];
-        C[0] = -r * C[0] * C[1];
+        double r = 1.0 / (1.0 - a[1] * c[0]);
+        d[0] = r * (d[0] - c[0] * d[1]);
+        a[0] = r * a[0];
+        c[0] = -r * c[0] * c[1];
     }
 
+    /**
+     * @brief Solve single-system TDMA using plan metadata.
+     */
     void PTDMASolverSingle::solve(PTDMAPlanSingle& plan, 
-                                  double* A, 
-                                  double* B, 
-                                  double* C,
-                                  double* D) {
+                                  double* a, 
+                                  double* b, 
+                                  double* c,
+                                  double* d) {
 
-        const int n_row = plan.n_row;
+        const int n_row = plan.n_row_;
         
         if (n_row <= 2) {
-            std::cerr << "Error: n_row must be greater than 2 in rank : " << plan.rank << std::endl;
+            std::cerr << "Error: n_row must be > 2 in rank : " << plan.rank_ << std::endl;
             MPI_Abort(MPI_COMM_WORLD, 1);
         }
 
-        if (plan.size == 1) {
-            dispatchTDMASolver<BatchType::Single>(plan.type, A, B, C, D, n_row, 1);
+        // single rank: direct dispatch
+        if (plan.size_ == 1) {
+            dispatchTDMASolver<BatchType::Single>(plan.type_, a, b, c, d, n_row, 1);
             return;
         }
 
-        forwardSingle(A, B, C, D, n_row);
-        backwardSingle(A, C, D, n_row);
+        // parallel: local elimination
+        forwardSingle(a, b, c, d, n_row);
+        backwardSingle(a, c, d, n_row);
 
-        plan.A_rd[0] = A[0]; plan.A_rd[1] = A[n_row - 1];
-        plan.C_rd[0] = C[0]; plan.C_rd[1] = C[n_row - 1];
-        plan.D_rd[0] = D[0]; plan.D_rd[1] = D[n_row - 1];
+        // gather boundary data
+        plan.a_rd_[0] = a[0]; plan.a_rd_[1] = a[n_row - 1];
+        plan.c_rd_[0] = c[0]; plan.c_rd_[1] = c[n_row - 1];
+        plan.d_rd_[0] = d[0]; plan.d_rd_[1] = d[n_row - 1];
 
-        MPI_Gather(plan.A_rd.data(), 2, MPI_DOUBLE, plan.A_rt.data(), 2, MPI_DOUBLE, plan.root_rank, plan.comm_ptdma);
-        MPI_Gather(plan.C_rd.data(), 2, MPI_DOUBLE, plan.C_rt.data(), 2, MPI_DOUBLE, plan.root_rank, plan.comm_ptdma);
-        MPI_Gather(plan.D_rd.data(), 2, MPI_DOUBLE, plan.D_rt.data(), 2, MPI_DOUBLE, plan.root_rank, plan.comm_ptdma);
+        MPI_Gather(plan.a_rd_.data(), 2, MPI_DOUBLE, 
+                   plan.a_rt_.data(), 2, MPI_DOUBLE, 
+                   plan.root_rank_, plan.comm_ptdma_);
 
-        if (plan.rank == plan.root_rank) {
-            dispatchTDMASolver<BatchType::Single>(plan.type, plan.A_rt.data(), plan.B_rt.data(), plan.C_rt.data(), plan.D_rt.data(), plan.n_row_rt, 1);
+        MPI_Gather(plan.c_rd_.data(), 2, MPI_DOUBLE, 
+                   plan.c_rt_.data(), 2, MPI_DOUBLE, 
+                   plan.root_rank_, plan.comm_ptdma_);
+
+        MPI_Gather(plan.d_rd_.data(), 2, MPI_DOUBLE, 
+                   plan.d_rt_.data(), 2, MPI_DOUBLE, 
+                   plan.root_rank_, plan.comm_ptdma_);
+
+        if (plan.rank_ == plan.root_rank_) {
+            dispatchTDMASolver<BatchType::Single>(plan.type_, 
+                    plan.a_rt_.data(), plan.b_rt_.data(), 
+                    plan.c_rt_.data(), plan.d_rt_.data(), plan.n_row_rt_, 1);
         }
 
-        MPI_Scatter(plan.D_rt.data(), 2, MPI_DOUBLE, plan.D_rd.data(), 2, MPI_DOUBLE, plan.root_rank, plan.comm_ptdma);
+        MPI_Scatter(plan.d_rt_.data(), 2, MPI_DOUBLE, 
+                    plan.d_rd_.data(), 2, MPI_DOUBLE, 
+                    plan.root_rank_, plan.comm_ptdma_);
 
-        D[0] = plan.D_rd[0];
-        D[n_row - 1] = plan.D_rd[1];
+        // reconstruct solution
+        d[0] = plan.d_rd_[0];
+        d[n_row - 1] = plan.d_rd_[1];
 
         for (int i = 1; i < n_row - 1; i++) {
-            D[i] = D[i] - A[i] * D[0] - C[i] * D[n_row - 1];
+            d[i] = d[i] - a[i] * d[0] - c[i] * d[n_row - 1];
         }
         return;
     }
 
-    // Many
-    void PTDMAPlanMany::create(int n_row_, int n_sys_, MPI_Comm comm_ptdma_, TDMAType type_) {
+    /**
+     * @brief Create plan for many system across ranks.
+     */
+    void PTDMAPlanMany::create(int n_row, int n_sys, MPI_Comm comm_ptdma, 
+                               TDMAType type) {
         
-        n_row = n_row_;
-        n_sys = n_sys_;
-        MPI_Comm_dup(comm_ptdma_, &comm_ptdma);
-        MPI_Comm_size(comm_ptdma, &size);
-        MPI_Comm_rank(comm_ptdma, &rank);
-        type = type_;
+        n_row_ = n_row;
+        n_sys_ = n_sys;
+        MPI_Comm_dup(comm_ptdma, &comm_ptdma_);
+        MPI_Comm_size(comm_ptdma_, &size_);
+        MPI_Comm_rank(comm_ptdma_, &rank_);
+        type_ = type;
 
-        const int n_sys_rd = n_sys;
+        // We only need the first and last row for the reduced system
+        const int n_sys_rd = n_sys_;
         const int n_row_rd = 2;
-        std::vector<int> n_sys_rt_array(size);
     
-        // Compute local and global problem dimensions
-        n_sys_rt = Util::para_range_n(1, n_sys_rd, size, rank);
-        n_row_rt = n_row_rd * size;
+        n_sys_rt_ = Util::para_range_n(1, n_sys_rd, size_, rank_);
+        n_row_rt_ = n_row_rd * size_;
     
-        MPI_Allgather(&n_sys_rt, 1, MPI_INT, n_sys_rt_array.data(), 1, MPI_INT, comm_ptdma);
+        // Gather all local n_sys_rt_ to build subarray types
+        std::vector<int> n_sys_rt_array(size_);
+        MPI_Allgather(&n_sys_rt_, 1, MPI_INT, n_sys_rt_array.data(), 1, MPI_INT,
+                      comm_ptdma_);
         
-        A_rd.resize(n_row_rd, n_sys_rd);
-        B_rd.assign(n_row_rd, n_sys_rd, 1.0);
-        C_rd.resize(n_row_rd, n_sys_rd);
-        D_rd.resize(n_row_rd, n_sys_rd);
+        // Resize buffers for reduced system (two rows × n_sys)
+        a_rd_.resize(n_row_rd, n_sys_rd);
+        b_rd_.assign(n_row_rd, n_sys_rd, 1.0);
+        c_rd_.resize(n_row_rd, n_sys_rd);
+        d_rd_.resize(n_row_rd, n_sys_rd);
     
-        A_rt.resize(n_row_rt, n_sys_rt);
-        B_rt.assign(n_row_rt, n_sys_rt, 1.0);
-        C_rt.resize(n_row_rt, n_sys_rt);
-        D_rt.resize(n_row_rt, n_sys_rt);
+        // Resize buffers for transposed system (n_row_rt × n_sys_rt)
+        a_rt_.resize(n_row_rt_, n_sys_rt_);
+        b_rt_.assign(n_row_rt_, n_sys_rt_, 1.0);
+        c_rt_.resize(n_row_rt_, n_sys_rt_);
+        d_rt_.resize(n_row_rt_, n_sys_rt_);
     
-        ddtype_FS.resize(size);
-        ddtype_BS.resize(size);
+        // Build noncontiguous MPI types for the forward/backward exchange
+        ddtype_rd_.resize(size_);
+        ddtype_rt_.resize(size_);
     
-        for (int i = 0; i < size; ++i) {
+        for (int i = 0; i < size_; ++i) {
             int bigsize[2] = {n_row_rd, n_sys_rd};
             int subsize[2] = {n_row_rd, n_sys_rt_array[i]};
-            int start[2] = {0, std::accumulate(n_sys_rt_array.begin(), n_sys_rt_array.begin() + i, 0)};
+            int start[2] = {0, std::accumulate(n_sys_rt_array.begin(), 
+                            n_sys_rt_array.begin() + i, 0)};
     
-            MPI_Type_create_subarray(2, bigsize, subsize, start, MPI_ORDER_C, MPI_DOUBLE, &ddtype_FS[i]);
-            MPI_Type_commit(&ddtype_FS[i]);
+            MPI_Type_create_subarray(2, bigsize, subsize, start, 
+                                     MPI_ORDER_C, MPI_DOUBLE, &ddtype_rd_[i]);
+            MPI_Type_commit(&ddtype_rd_[i]);
     
             int rstart[2] = {n_row_rd * i, 0};
-            int rsub[2] = {n_row_rd, n_sys_rt};
-            int rbig[2] = {n_row_rt, n_sys_rt};
+            int rsub[2] = {n_row_rd, n_sys_rt_};
+            int rbig[2] = {n_row_rt_, n_sys_rt_};
     
-            MPI_Type_create_subarray(2, rbig, rsub, rstart, MPI_ORDER_C, MPI_DOUBLE, &ddtype_BS[i]);
-            MPI_Type_commit(&ddtype_BS[i]);
+            MPI_Type_create_subarray(2, rbig, rsub, rstart, 
+                                     MPI_ORDER_C, MPI_DOUBLE, &ddtype_rt_[i]);
+            MPI_Type_commit(&ddtype_rt_[i]);
         }
     
-        count_send.assign(size, 1);
-        displ_send.assign(size, 0);
-        count_recv.assign(size, 1);
-        displ_recv.assign(size, 0);
+        // Simple 1-to-1 counts/displacements for Ialltoallw
+        count_send_.assign(size_, 1);
+        displ_send_.assign(size_, 0);
+        count_recv_.assign(size_, 1);
+        displ_recv_.assign(size_, 0);
 
         return;
     }
-    
+
+    /**
+     * @brief Destroy plan for many systems.
+     */
     void PTDMAPlanMany::destroy() {
-        for (int i = 0; i < size; ++i) {
-            MPI_Type_free(&ddtype_FS[i]);
-            MPI_Type_free(&ddtype_BS[i]);
-        }
+        for (auto &t : ddtype_rd_) MPI_Type_free(&t);
+        for (auto &t : ddtype_rt_) MPI_Type_free(&t);
     
-        ddtype_FS.clear();
-        ddtype_BS.clear();
-        count_send.clear();
-        displ_send.clear();
-        count_recv.clear();
-        displ_recv.clear();
+        ddtype_rd_.clear();
+        ddtype_rt_.clear();
+        count_send_.clear();
+        displ_send_.clear();
+        count_recv_.clear();
+        displ_recv_.clear();
     
-        A_rd.clear(); B_rd.clear(); C_rd.clear(); D_rd.clear();
-        A_rt.clear(); B_rt.clear(); C_rt.clear(); D_rt.clear();
+        a_rd_.clear(); b_rd_.clear(); c_rd_.clear(); d_rd_.clear();
+        a_rt_.clear(); b_rt_.clear(); c_rt_.clear(); d_rt_.clear();
 
         return;
     }    
 
+    /**
+     * @brief Forward elimination for batched TDMA (many systems).
+     */
+    static void forwardMany(double* a, const double* b, 
+                            double* c, double* d,
+                            int n_row, int n_sys) {
 
-    static void forwardMany(double* A, const double* B, 
-                            double* C, double* D,
-                            const int n_row, const int n_sys) {
-
+        // Normalize the first two boundary rows
         for (int j = 0; j < n_sys; j++) {
-
-            A[j] /= B[j];D[j] /= B[j]; C[j] /= B[j];
-            A[j + n_sys] /= B[j + n_sys]; 
-            D[j + n_sys] /= B[j + n_sys];
-            C[j + n_sys] /= B[j + n_sys];
+            for (int i = 0; i < 2; i++) {
+                int idx = i * n_sys + j;
+                double inv = 1.0 / b[idx];
+                a[idx] *= inv;
+                c[idx] *= inv;
+                d[idx] *= inv;
+            }
+            // a[j] /= b[j];d[j] /= b[j]; c[j] /= b[j];
+            // a[j + n_sys] /= b[j + n_sys]; 
+            // d[j + n_sys] /= b[j + n_sys];
+            // c[j + n_sys] /= b[j + n_sys];
         }
 
+        // Eliminate interior rows
         for (int i = 2; i < n_row; ++i) {
             int idx = i * n_sys;
             int idx_prev = idx - n_sys;
             for (int j = 0; j < n_sys; ++j) {
-                double r = 1.0 / (B[idx] - A[idx] * C[idx_prev]);
-                D[idx] = r * (D[idx] - A[idx] * D[idx_prev]);
-                C[idx] = r * C[idx];
-                A[idx] = -r * A[idx] * A[idx_prev];
+                double r = 1.0 / (b[idx] - a[idx] * c[idx_prev]);
+                d[idx] = r * (d[idx] - a[idx] * d[idx_prev]);
+                c[idx] = r * c[idx];
+                a[idx] = -r * a[idx] * a[idx_prev];
                 ++idx; ++idx_prev;
             }
         }
     }
 
-    static void backwardMany(double* A, double* C, double* D,
-                             const int n_row, const int n_sys) {
+    /**
+     * @brief Backward substitution for batched TDMA (many systems).
+     */
+    static void backwardMany(double* a, double* c, double* d,
+                             int n_row, int n_sys) {
 
         for (int i = n_row - 3; i >= 1; --i) {
             int idx = i * n_sys;
             int idx_next = idx + n_sys;
             for (int j = 0; j < n_sys; ++j) {
-                D[idx] -= C[idx] * D[idx_next];
-                A[idx] -= C[idx] * A[idx_next];
-                C[idx] = -C[idx] * C[idx_next];
+                d[idx] -= c[idx] * d[idx_next];
+                a[idx] -= c[idx] * a[idx_next];
+                c[idx] = -c[idx] * c[idx_next];
                 ++idx; ++idx_next;
             }
         }
     }
 
-    static void reduceMany(const double* A, const double* C, const double* D,
-                           double* A0, double* A1, double* C0, double* C1,
-                           double* D0, double* D1,
-                           const int n_row, const int n_sys) {
+    /**
+    * @brief Reduce boundary data into two vectors (D0/D1, A0/A1, C0/C1).
+    */
+    static void reduceMany(const double* a, const double* c, const double* d,
+                           double* a0, double* a1, 
+                           double* c0, double* c1,
+                           double* d0, double* d1,
+                           int n_row, int n_sys) {
 
         for (int j = 0; j < n_sys; ++j) {
-            double r = 1.0 / (1.0 - A[j + n_sys] * C[j]);
-            D0[j] = r * (D[j] - C[j] * D[j + n_sys]);
-            A0[j] = r * A[j];
-            C0[j] = -r * C[j] * C[j + n_sys];
-            A1[j] = A[(n_row - 1) * n_sys + j];
-            C1[j] = C[(n_row - 1) * n_sys + j];
-            D1[j] = D[(n_row - 1) * n_sys + j];
+            double r = 1.0 / (1.0 - a[j + n_sys] * c[j]);
+            d0[j] = r * (d[j] - c[j] * d[j + n_sys]);
+            a0[j] = r * a[j];
+            c0[j] = -r * c[j] * c[j + n_sys];
+            a1[j] = a[(n_row - 1) * n_sys + j];
+            c1[j] = c[(n_row - 1) * n_sys + j];
+            d1[j] = d[(n_row - 1) * n_sys + j];
         }
     }
-
-    static void reconstructMany(const double* A, const double* C, double* D,
-                                const double* D0, const double* D1,
-                                const int n_row, const int n_sys) {
+    /**
+    * @brief Reconstruct the full solution from reduced boundary data.
+    */
+    static void reconstructMany(const double* a, const double* c, double* d,
+                                const double* d0, const double* d1,
+                                int n_row, int n_sys) {
 
         for (int j = 0; j < n_sys; ++j) {
-            D[0 * n_sys + j]           = D0[j];
-            D[(n_row - 1) * n_sys + j] = D1[j];
+            d[0 * n_sys + j]           = d0[j];
+            d[(n_row - 1) * n_sys + j] = d1[j];
         }
 
         for (int i = 1; i < n_row - 1; ++i) {
             int idx = i * n_sys;
             for (int j = 0; j < n_sys; ++j) {
-                D[idx] = D[idx] - A[idx] * D0[j] - C[idx] * D1[j];
+                d[idx] = d[idx] - a[idx] * d0[j] - c[idx] * d1[j];
                 ++idx;
             }
         }
     }
 
+    /**
+    * @brief Solve many independent tridiagonal systems using plan metadata.
+    */
     void PTDMASolverMany::solve(PTDMAPlanMany& plan,
-                                double* A,double* B, double* C, double* D) {
+                                double* a,double* b, double* c, double* d) {
 
-        const int n_row = plan.n_row;
-        const int n_sys = plan.n_sys;
+        const int n_row = plan.n_row_;
+        const int n_sys = plan.n_sys_;
 
         assert(n_row > 2);
 
-        if (plan.size == 1) {
-            dispatchTDMASolver<BatchType::Many>(plan.type, A, B, C, D, n_row, n_sys);
+        if (plan.size_ == 1) {
+            dispatchTDMASolver<BatchType::Many>(plan.type_, a, b, c, d, n_row, n_sys);
             return;
         }
 
-        forwardMany(A, B, C, D, n_row, n_sys);
-        backwardMany(A, C, D, n_row, n_sys);
-        reduceMany(A, C, D,
-                     plan.A_rd.getData(), plan.A_rd.getData() + n_sys,
-                     plan.C_rd.getData(), plan.C_rd.getData() + n_sys,
-                     plan.D_rd.getData(), plan.D_rd.getData() + n_sys,
-                     n_row, n_sys);
+        // local elimination
+        forwardMany(a, b, c, d, n_row, n_sys);
+        backwardMany(a, c, d, n_row, n_sys);
 
-        // MPI transpose of reduced system
+        // reduce to two-row system
+        reduceMany(a, c, d,
+                   plan.a_rd_.getData(), plan.a_rd_.getData() + n_sys,
+                   plan.c_rd_.getData(), plan.c_rd_.getData() + n_sys,
+                   plan.d_rd_.getData(), plan.d_rd_.getData() + n_sys,
+                   n_row, n_sys);
+
+        // transpose across ranks (non-blocking)
         MPI_Request request[3];
         MPI_Status statuses[3];
 
-        MPI_Ialltoallw(plan.A_rd.getData(), plan.count_send.data(), plan.displ_send.data(), 
-                    plan.ddtype_FS.data(),
-                    plan.A_rt.getData(), plan.count_recv.data(), plan.displ_recv.data(), 
-                    plan.ddtype_BS.data(),
-                    plan.comm_ptdma, &request[0]);
+        MPI_Ialltoallw(plan.a_rd_.getData(), plan.count_send_.data(), 
+                       plan.displ_send_.data(), plan.ddtype_rd_.data(),
+                       plan.a_rt_.getData(), plan.count_recv_.data(), 
+                       plan.displ_recv_.data(), plan.ddtype_rt_.data(),
+                       plan.comm_ptdma_, &request[0]);
 
-        MPI_Ialltoallw(plan.C_rd.getData(), plan.count_send.data(), plan.displ_send.data(), 
-                    plan.ddtype_FS.data(),
-                    plan.C_rt.getData(), plan.count_recv.data(), plan.displ_recv.data(), 
-                    plan.ddtype_BS.data(),
-                    plan.comm_ptdma, &request[1]);
+        MPI_Ialltoallw(plan.c_rd_.getData(), plan.count_send_.data(), 
+                       plan.displ_send_.data(), plan.ddtype_rd_.data(),
+                       plan.c_rt_.getData(), plan.count_recv_.data(), 
+                       plan.displ_recv_.data(), plan.ddtype_rt_.data(),
+                       plan.comm_ptdma_, &request[1]);
 
-        MPI_Ialltoallw(plan.D_rd.getData(), plan.count_send.data(), plan.displ_send.data(), 
-                    plan.ddtype_FS.data(),
-                    plan.D_rt.getData(), plan.count_recv.data(), plan.displ_recv.data(), 
-                    plan.ddtype_BS.data(),
-                    plan.comm_ptdma, &request[2]);
+        MPI_Ialltoallw(plan.d_rd_.getData(), plan.count_send_.data(), 
+                       plan.displ_send_.data(), plan.ddtype_rd_.data(),
+                       plan.d_rt_.getData(), plan.count_recv_.data(), 
+                       plan.displ_recv_.data(), plan.ddtype_rt_.data(),
+                       plan.comm_ptdma_, &request[2]);
 
         MPI_Waitall(3, request, statuses);
+
         // Solve the reduced tridiagonal systems
+        dispatchTDMASolver<BatchType::Many>(plan.type_, plan.a_rt_.getData(), 
+            plan.b_rt_.getData(), plan.c_rt_.getData(), plan.d_rt_.getData(), 
+            plan.n_row_rt_, plan.n_sys_rt_);
 
-        dispatchTDMASolver<BatchType::Many>(plan.type, plan.A_rt.getData(), plan.B_rt.getData(), plan.C_rt.getData(), plan.D_rt.getData(), plan.n_row_rt, plan.n_sys_rt);
+        // transpose back and reconstruct
+        MPI_Ialltoallw(plan.d_rt_.getData(), plan.count_recv_.data(), 
+                       plan.displ_recv_.data(), plan.ddtype_rt_.data(),
+                       plan.d_rd_.getData(), plan.count_send_.data(), 
+                       plan.displ_send_.data(), plan.ddtype_rd_.data(),
+                       plan.comm_ptdma_, &request[0]);
 
-        MPI_Ialltoallw(plan.D_rt.getData(), plan.count_recv.data(), plan.displ_recv.data(), 
-                    plan.ddtype_BS.data(),
-                    plan.D_rd.getData(), plan.count_send.data(), plan.displ_send.data(), 
-                    plan.ddtype_FS.data(),
-                    plan.comm_ptdma, &request[0]);
         MPI_Waitall(1, request, statuses);
 
-        reconstructMany(A, C, D, 
-                            plan.D_rd.getData(), plan.D_rd.getData() + n_sys,
-                            n_row, n_sys);
+        reconstructMany(a, c, d, plan.d_rd_.getData(), 
+                        plan.d_rd_.getData() + n_sys, n_row, n_sys);
     }
 
-    void PTDMAPlanManyRHS::create(int n_row_, int n_sys_, MPI_Comm comm_ptdma_, TDMAType type_) {
-        n_row = n_row_;
-        n_sys = n_sys_;
-        type = type_;
+    /**
+    * @brief Create plan for many-RHS TDMA with shared diagonals.
+    */
+    void PTDMAPlanManyRHS::create(int n_row, int n_sys, MPI_Comm comm_ptdma, 
+                                  TDMAType type) {
+        n_row_ = n_row;
+        n_sys_ = n_sys;
+        type_ = type;
 
-        MPI_Comm_dup(comm_ptdma_, &comm_ptdma);
-        MPI_Comm_size(comm_ptdma, &size);
-        MPI_Comm_rank(comm_ptdma, &rank);
+        MPI_Comm_dup(comm_ptdma, &comm_ptdma_);
+        MPI_Comm_size(comm_ptdma, &size_);
+        MPI_Comm_rank(comm_ptdma, &rank_);
 
-        int n_sys_rd = n_sys;
+        int n_sys_rd = n_sys_;
         int n_row_rd = 2;
-        std::vector<int> n_sys_rt_array(size);
+        std::vector<int> n_sys_rt_array(size_);
 
         // Compute local and global problem dimensions
-        n_sys_rt = Util::para_range_n(1, n_sys_rd, size, rank);
-        n_row_rt = n_row_rd * size;
+        n_sys_rt_ = Util::para_range_n(1, n_sys_rd, size_, rank_);
+        n_row_rt_ = n_row_rd * size_;
 
-        MPI_Allgather(&n_sys_rt, 1, MPI_INT, n_sys_rt_array.data(), 1, MPI_INT, comm_ptdma);
+        MPI_Allgather(&n_sys_rt_, 1, MPI_INT, 
+                      n_sys_rt_array.data(), 1, MPI_INT, comm_ptdma_);
        
-        A_rd.resize(n_row_rd);
-        B_rd.assign(n_row_rd, 1);
-        C_rd.resize(n_row_rd);
-        D_rd.resize(n_row_rd, n_sys_rd);
+        a_rd_.resize(n_row_rd);
+        b_rd_.assign(n_row_rd, 1);
+        c_rd_.resize(n_row_rd);
+        d_rd_.resize(n_row_rd, n_sys_rd);
 
-        A_rt.resize(n_row_rt);
-        B_rt.assign(n_row_rt, 1);
-        C_rt.resize(n_row_rt);
-        D_rt.resize(n_row_rt, n_sys_rt);
+        a_rt_.resize(n_row_rt_);
+        b_rt_.assign(n_row_rt_, 1);
+        c_rt_.resize(n_row_rt_);
+        d_rt_.resize(n_row_rt_, n_sys_rt_);
 
-        ddtype_FS.resize(size);
-        ddtype_BS.resize(size);
+        ddtype_rd_.resize(size_);
+        ddtype_rt_.resize(size_);
 
-        for (int i = 0; i < size; ++i) {
+        for (int i = 0; i < size_; ++i) {
             int bigsize[2] = {n_row_rd, n_sys_rd};
             int subsize[2] = {n_row_rd, n_sys_rt_array[i]};
-            int start[2] = {0, std::accumulate(n_sys_rt_array.begin(), n_sys_rt_array.begin() + i, 0)};
+            int start[2] = {0, std::accumulate(n_sys_rt_array.begin(), 
+                            n_sys_rt_array.begin() + i, 0)};
 
-            MPI_Type_create_subarray(2, bigsize, subsize, start, MPI_ORDER_C, MPI_DOUBLE, &ddtype_FS[i]);
-            MPI_Type_commit(&ddtype_FS[i]);
+            MPI_Type_create_subarray(2, bigsize, subsize, start, 
+                                     MPI_ORDER_C, MPI_DOUBLE, &ddtype_rd_[i]);
+            MPI_Type_commit(&ddtype_rd_[i]);
 
             int rstart[2] = {n_row_rd * i, 0};
-            int rsub[2] = {n_row_rd, n_sys_rt};
-            int rbig[2] = {n_row_rt, n_sys_rt};
+            int rsub[2] = {n_row_rd, n_sys_rt_};
+            int rbig[2] = {n_row_rt_, n_sys_rt_};
 
-            MPI_Type_create_subarray(2, rbig, rsub, rstart, MPI_ORDER_C, MPI_DOUBLE, &ddtype_BS[i]);
-            MPI_Type_commit(&ddtype_BS[i]);
+            MPI_Type_create_subarray(2, rbig, rsub, rstart, 
+                                     MPI_ORDER_C, MPI_DOUBLE, &ddtype_rt_[i]);
+            MPI_Type_commit(&ddtype_rt_[i]);
         }
 
-        count_send.assign(size, 1);
-        displ_send.assign(size, 0);
-        count_recv.assign(size, 1);
-        displ_recv.assign(size, 0);
+        count_send_.assign(size_, 1);
+        displ_send_.assign(size_, 0);
+        count_recv_.assign(size_, 1);
+        displ_recv_.assign(size_, 0);
         return;
     }
 
+
+    /**
+    * @brief Destroy ManyRHS plan, free resources.
+    */
     void PTDMAPlanManyRHS::destroy() {
-        for (int i = 0; i < size; ++i) {
-            MPI_Type_free(&ddtype_FS[i]);
-            MPI_Type_free(&ddtype_BS[i]);
-        }
+        for (auto &t : ddtype_rd_) MPI_Type_free(&t);
+        for (auto &t : ddtype_rt_) MPI_Type_free(&t);
 
-        ddtype_FS.clear();
-        ddtype_BS.clear();
-        count_send.clear();
-        displ_send.clear();
-        count_recv.clear();
-        displ_recv.clear();
+        ddtype_rd_.clear();
+        ddtype_rt_.clear();
+        count_send_.clear();
+        displ_send_.clear();
+        count_recv_.clear();
+        displ_recv_.clear();
 
-        A_rd.clear(); B_rd.clear(); C_rd.clear(); D_rd.clear();
-        A_rt.clear(); B_rt.clear(); C_rt.clear(); D_rt.clear();
+        a_rd_.clear(); b_rd_.clear(); c_rd_.clear(); d_rd_.clear();
+        a_rt_.clear(); b_rt_.clear(); c_rt_.clear(); d_rt_.clear();
         return;
     }    
 
-    static void forwardManyRHS(double* A, const double* B, double* C, double* D,
+    static void forwardManyRHS(double* a, const double* b, double* c, double* d,
                                const int n_row, const int n_sys) {
-        A[0] /= B[0];
-        C[0] /= B[0];
-        A[1] /= B[1];
-        C[1] /= B[1];
+        a[0] /= b[0];
+        c[0] /= b[0];
+        a[1] /= b[1];
+        c[1] /= b[1];
 
         for (int j = 0; j < n_sys; j++) {
-            D[j] /= B[0];
-            D[n_sys + j] /= B[1];
+            d[j] /= b[0];
+            d[n_sys + j] /= b[1];
         }
 
         for (int i = 2; i < n_row; i++) {
-            double r = 1.0 / (B[i] - A[i] * C[i - 1]);
+            double r = 1.0 / (b[i] - a[i] * c[i - 1]);
             int idx = i * n_sys;
             int idx_prev = idx - n_sys;
             for (int j = 0; j < n_sys; j++) {
-                D[idx] = r * (D[idx] - A[i] * D[idx_prev]);
+                d[idx] = r * (d[idx] - a[i] * d[idx_prev]);
                 ++idx; ++idx_prev;
             }
-            C[i] = r * C[i];
-            A[i] = -r * A[i] * A[i - 1];
+            c[i] = r * c[i];
+            a[i] = -r * a[i] * a[i - 1];
         }
     }
 
-    static void backwardManyRHS(double* A, double* C, double* D,
+    static void backwardManyRHS(double* a, double* c, double* d,
                                 const int n_row, const int n_sys) {
         for (int i = n_row - 3; i >= 1; i--) {
             int idx = i * n_sys;
             int idx_next = idx + n_sys;
             for (int j = 0; j < n_sys; j++) {
-                D[idx] = D[idx] - C[i] * D[idx_next];
+                d[idx] = d[idx] - c[i] * d[idx_next];
                 ++idx; ++idx_next;
             }
-            A[i] = A[i] - C[i] * A[i + 1];
-            C[i] = -C[i] * C[i + 1];
+            a[i] = a[i] - c[i] * a[i + 1];
+            c[i] = -c[i] * c[i + 1];
         }
     }
 
-    static void reduceManyRHS(const double* A, const double* C, double* D,
-                              double* A0, double* A1, double* C0, double* C1,
-                              double* D0, double* D1,
+    static void reduceManyRHS(const double* a, const double* c, double* d,
+                              double* a0, double* a1, double* c0, double* c1,
+                              double* d0, double* d1,
                               const int n_row, const int n_sys) {
-        double r = 1.0 / (1.0 - A[1] * C[0]);
+        double r = 1.0 / (1.0 - a[1] * c[0]);
         for (int j = 0; j < n_sys; ++j) {
-            D0[j] = r * (D[j] - C[0] * D[n_sys + j]);
-            D1[j] = D[(n_row - 1) * n_sys + j];
+            d0[j] = r * (d[j] - c[0] * d[n_sys + j]);
+            d1[j] = d[(n_row - 1) * n_sys + j];
         }
-        A0[0] = r * A[0];
-        C0[0] = -r * C[0] * C[1];
-        A1[0] = A[n_row - 1];
-        C1[0] = C[n_row - 1];
+        a0[0] = r * a[0];
+        c0[0] = -r * c[0] * c[1];
+        a1[0] = a[n_row - 1];
+        c1[0] = c[n_row - 1];
     }
 
-    static void reconstructManyRHS(const double* A, const double* C, double* D,
-                                   const double* D0, const double* D1,
+    static void reconstructManyRHS(const double* a, const double* c, double* d,
+                                   const double* d0, const double* d1,
                                    const int n_row, const int n_sys) {
         for (int j = 0; j < n_sys; ++j) {
-            D[j] = D0[j];
-            D[(n_row - 1) * n_sys + j] = D1[j];
+            d[j] = d0[j];
+            d[(n_row - 1) * n_sys + j] = d1[j];
         }
 
         for (int i = 1; i < n_row - 1; ++i) {
             int idx = i * n_sys;
             for (int j = 0; j < n_sys; ++j) {
-                D[idx] = D[idx] - A[i] * D0[j] - C[i] * D1[j];
+                d[idx] = d[idx] - a[i] * d0[j] - c[i] * d1[j];
                 ++idx;
             }
         }
     }
 
+    /**
+    * @brief Solve many-RHS TDMA using plan metadata.
+    */
     void PTDMASolverManyRHS::solve(PTDMAPlanManyRHS& plan,
-                                   double* A, double* B, double* C, double* D) {
+                                   double* a, double* b, double* c, double* d) {
 
-        const int n_row = plan.n_row;
-        const int n_sys = plan.n_sys;
+        const int n_row = plan.n_row_;
+        const int n_sys = plan.n_sys_;
 
         assert(n_row > 2);
 
-        if (plan.size == 1) {
-            dispatchTDMASolver<BatchType::ManyRHS>(plan.type, A, B, C, D, n_row, n_sys);
+        if (plan.size_ == 1) {
+            dispatchTDMASolver<BatchType::ManyRHS>(plan.type_, a, b, c, d, n_row, n_sys);
             return;
         }
-        forwardManyRHS(A, B, C, D, n_row, n_sys);
-        backwardManyRHS(A, C, D, n_row, n_sys);
-        reduceManyRHS(A, C, D,
-                      plan.A_rd.data(), plan.A_rd.data() + 1,
-                      plan.C_rd.data(), plan.C_rd.data() + 1,
-                      plan.D_rd.getData(), plan.D_rd.getData() + n_sys,
+
+        // Forward/backward on each RHS
+        forwardManyRHS(a, b, c, d, n_row, n_sys);
+        backwardManyRHS(a, c, d, n_row, n_sys);
+
+        // Reduce to boundary vectors
+        reduceManyRHS(a, c, d,
+                      plan.a_rd_.data(), plan.a_rd_.data() + 1,
+                      plan.c_rd_.data(), plan.c_rd_.data() + 1,
+                      plan.d_rd_.getData(), plan.d_rd_.getData() + n_sys,
                       n_row, n_sys);
 
         // Transpose the reduced system using MPI_Ialltoallw
         MPI_Request request[3];
         MPI_Status statuses[3];
 
-        MPI_Iallgather(plan.A_rd.data(), 2, MPI_DOUBLE, 
-                       plan.A_rt.data(), 2, MPI_DOUBLE,
-                       plan.comm_ptdma, &request[0]);
+        MPI_Iallgather(plan.a_rd_.data(), 2, MPI_DOUBLE, 
+                       plan.a_rt_.data(), 2, MPI_DOUBLE,
+                       plan.comm_ptdma_, &request[0]);
 
-        MPI_Iallgather(plan.C_rd.data(), 2, MPI_DOUBLE, plan.C_rt.data(), 2, MPI_DOUBLE,
-                        plan.comm_ptdma, &request[1]);
+        MPI_Iallgather(plan.c_rd_.data(), 2, MPI_DOUBLE, 
+                       plan.c_rt_.data(), 2, MPI_DOUBLE,
+                       plan.comm_ptdma_, &request[1]);
 
-        MPI_Ialltoallw(plan.D_rd.getData(), plan.count_send.data(), plan.displ_send.data(), 
-                        plan.ddtype_FS.data(),
-                        plan.D_rt.getData(), plan.count_recv.data(), plan.displ_recv.data(), 
-                        plan.ddtype_BS.data(),
-                        plan.comm_ptdma, &request[2]);
+        MPI_Ialltoallw(plan.d_rd_.getData(), plan.count_send_.data(), 
+                       plan.displ_send_.data(), plan.ddtype_rd_.data(),
+                       plan.d_rt_.getData(), plan.count_recv_.data(), 
+                       plan.displ_recv_.data(), plan.ddtype_rt_.data(),
+                       plan.comm_ptdma_, &request[2]);
 
         MPI_Waitall(3, request, statuses);
 
         // Solve the reduced tridiagonal systems
-        dispatchTDMASolver<BatchType::ManyRHS>(plan.type, plan.A_rt.data(), plan.B_rt.data(), plan.C_rt.data(), plan.D_rt.getData(), plan.n_row_rt, plan.n_sys_rt);
+        dispatchTDMASolver<BatchType::ManyRHS>(plan.type_, plan.a_rt_.data(), 
+            plan.b_rt_.data(), plan.c_rt_.data(), plan.d_rt_.getData(), 
+            plan.n_row_rt_, plan.n_sys_rt_);
 
         // Transpose solutions back
-        MPI_Ialltoallw( plan.D_rt.getData(), plan.count_recv.data(), plan.displ_recv.data(), 
-                        plan.ddtype_BS.data(),
-                        plan.D_rd.getData(), plan.count_send.data(), plan.displ_send.data(), 
-                        plan.ddtype_FS.data(),
-                        plan.comm_ptdma, &request[0]);
+        MPI_Ialltoallw( plan.d_rt_.getData(), plan.count_recv_.data(), 
+                        plan.displ_recv_.data(), plan.ddtype_rt_.data(),
+                        plan.d_rd_.getData(), plan.count_send_.data(), 
+                        plan.displ_send_.data(), plan.ddtype_rd_.data(),
+                        plan.comm_ptdma_, &request[0]);
         MPI_Waitall(1, request, statuses);
 
         // Update full solution from reduced solution
-        reconstructManyRHS(A, C, D,
-                                    plan.D_rd.getData(), 
-                                    plan.D_rd.getData() + n_sys,
-                                    n_row, n_sys);
+        reconstructManyRHS(a, c, d,
+                           plan.d_rd_.getData(), 
+                           plan.d_rd_.getData() + n_sys,
+                           n_row, n_sys);
     }
 
-
     template <TDMAType tdma_type, BatchType batch_type>
-    void batchSolver(double* A, double* B, double* C, double* D, int n_row, int n_sys) {
+    void batchSolver(double* a, double* b, double* c, double* d, int n_row, int n_sys) {
         if constexpr (batch_type == BatchType::Single) {
             if constexpr (tdma_type == TDMAType::Standard)
-                TDMASolver::single(A, B, C, D, n_row);
+                TDMASolver::single(a, b, c, d, n_row);
             else if constexpr (tdma_type == TDMAType::Cyclic)
-                TDMASolver::singleCyclic(A, B, C, D, n_row);
+                TDMASolver::singleCyclic(a, b, c, d, n_row);
         }
         else if constexpr (batch_type == BatchType::Many) {
             if constexpr (tdma_type == TDMAType::Standard)
-                TDMASolver::many(A, B, C, D, n_row, n_sys);
+                TDMASolver::many(a, b, c, d, n_row, n_sys);
             else if constexpr (tdma_type == TDMAType::Cyclic)
-                TDMASolver::manyCyclic(A, B, C, D, n_row, n_sys);
+                TDMASolver::manyCyclic(a, b, c, d, n_row, n_sys);
         }
         else if constexpr (batch_type == BatchType::ManyRHS) {
             if constexpr (tdma_type == TDMAType::Standard)
-                TDMASolver::manyRHS(A, B, C, D, n_row, n_sys);
+                TDMASolver::manyRHS(a, b, c, d, n_row, n_sys);
             else if constexpr (tdma_type == TDMAType::Cyclic)
-                TDMASolver::manyRHSCyclic(A, B, C, D, n_row, n_sys);
+                TDMASolver::manyRHSCyclic(a, b, c, d, n_row, n_sys);
         }
     }
 
     template <BatchType batch_type>
-    void dispatchTDMASolver(TDMAType type, double* A, double* B, double* C, double* D, int n_row, int n_sys) {
+    void dispatchTDMASolver(TDMAType type, double* a, double* b, double* c, double* d, 
+                            int n_row, int n_sys) {
         switch (type) {
             case TDMAType::Standard:
-                batchSolver<TDMAType::Standard, batch_type>(A, B, C, D, n_row, n_sys);
+                batchSolver<TDMAType::Standard, batch_type>(a, b, c, d, n_row, n_sys);
                 break;
             case TDMAType::Cyclic:
-                batchSolver<TDMAType::Cyclic, batch_type>(A, B, C, D, n_row, n_sys);
+                batchSolver<TDMAType::Cyclic, batch_type>(a, b, c, d, n_row, n_sys);
                 break;
             default:
                 throw std::invalid_argument("Unknown TDMAType");

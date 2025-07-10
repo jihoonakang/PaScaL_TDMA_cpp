@@ -1,100 +1,87 @@
-#include <vector>
-#include "dimArray.hpp"
-
+/**
+ * @file TDMASolver.hpp
+ * @brief Solver routines for tridiagonal and cyclic tridiagonal systems.
+ *
+ * Implements the Thomas algorithm and its variants for single,
+ * cyclic, and batched systems using std::vector and dimArray.
+ */
 #pragma once
 
+#include <vector>
+#include <cassert>
+#include "dimArray.hpp"
+
+/**
+ * @class TDMASolver
+ * @brief Static methods to solve tridiagonal linear systems.
+ *
+ * All methods perform in-place modifications on C and D arrays (or dimArray).
+ */
 class TDMASolver {
 public:
-    // Basic Thomas Algorithm for a single tridiagonal system
-    static void single(const std::vector<double>& A, 
-                       const std::vector<double>& B,
-                       std::vector<double>& C, 
-                       std::vector<double>& D, 
-                       const int n) {
 
-        C[0] /= B[0];
-        D[0] /= B[0];
+    /**
+     * @brief Solve a single tridiagonal system (Thomas algorithm).
+     * @param a Lower-diagonal (size n).
+     * @param b Diagonal (size n).
+     * @param c Upper-diagonal (size n), overwritten with modified coefficients.
+     * @param d Right-hand side (size n), overwritten with solution.
+     * @param n System dimension.
+     */
+     static void single(const std::vector<double>& a, 
+                        const std::vector<double>& b,
+                        std::vector<double>& c, 
+                        std::vector<double>& d, 
+                        const int n) {
 
-        for (int i = 1; i < n; i++) {
-            double m = 1.0 / (B[i] - A[i] * C[i - 1]);
-            D[i] = m * (D[i] - A[i] * D[i - 1]);
-            C[i] *= m;
-        }
-
-        for (int i = n - 2; i >= 0; i--) {
-            D[i] -= C[i] * D[i + 1];
-        }
+        single(a.data(), b.data(), c.data(), d.data(), n);
     }
 
-    // Thomas Algorithm for a cyclic tridiagonal system
-    static void singleCyclic(const std::vector<double>& A, 
-                             const std::vector<double>& B,
-                             std::vector<double>& C,
-                             std::vector<double>& D, 
+    /**
+     * @brief Solve a periodic tridiagonal system (cyclic Thomas algorithm).
+     * @param a Lower-diagonal (size n).
+     * @param b Diagonal (size n).
+     * @param c Upper-diagonal (size n).
+     * @param d Right-hand side (size n), overwritten with solution.
+     * @param n System dimension (>2).
+     */
+    static void singleCyclic(const std::vector<double>& a, 
+                             const std::vector<double>& b,
+                             std::vector<double>& c,
+                             std::vector<double>& d, 
                              const int n) {
 
-        std::vector<double> e(n, 0);
-
-        assert(n > 2);
-
-        e[1] = - A[1];
-        e[n - 1] = - C[n - 1];
-
-        D[1] /= B[1];
-        e[1] /= B[1];
-        C[1] /= B[1];
-
-        for (int i = 2; i < n; i++) {
-            double rr = 1.0 / (B[i] - A[i] * C[i - 1]);
-            D[i] = rr * (D[i] - A[i] * D[i - 1]);
-            e[i] = rr * (e[i] - A[i] * e[i - 1]);
-            C[i] *= rr;
-        }
-
-        for (int i = n - 2; i >= 1; i--) {
-            D[i] -= C[i] * D[i + 1];
-            e[i] -= C[i] * e[i + 1];
-        }
-
-        D[0] =  (D[0] - A[0] * D[n - 1] - C[0] * D[1]) / 
-                (B[0] + A[0] * e[n - 1] + C[0] * e[1]);
-
-        for (int i = 1; i < n; i++) {
-            D[i] += D[0] * e[i];
-        }
+        singleCyclic(a.data(), b.data(), c.data(), d.data(), n);
     }
 
-    // Solves multiple independent tridiagonal systems stored row-wise
+    /**
+     * @brief Solve multiple independent tridiagonal systems.
+     * @param a Lower-diagonal (n_row × n_sys), row-major.
+     * @param b Diagonal (n_row × n_sys).
+     * @param c Upper-diagonal (n_row × n_sys), overwritten.
+     * @param d RHS (n_row × n_sys), overwritten with solutions.
+     * @param n_row Number of rows per system.
+     * @param n_sys Number of independent systems.
+     */
     static void many(const dimArray<double>& a,
                      const dimArray<double>& b,
                      dimArray<double>& c,
                      dimArray<double>& d,
                      const int n_row, 
                      const int n_sys) {
-    
-        for (int j = 0; j < n_sys; j++) {
-            d(0, j) /= b(0, j);
-            c(0, j) /= b(0, j);
-        }
 
-        double r = 0.0;
-    
-        for (int i = 1; i < n_row; i++) {
-            for (int j = 0; j < n_sys; j++) {
-                r = 1.0 / (b(i, j) - a(i, j) * c(i - 1, j));
-                d(i, j) = r * (d(i, j) - a(i, j) * d(i - 1, j));
-                c(i, j) = r * c(i, j);
-            }
-        }
-    
-        for (int i = n_row - 2; i >= 0; i--) {
-            for (int j = 0; j < n_sys; j++) {
-                d(i, j) -= c(i, j) * d(i + 1, j);
-            }
-        }
+        many(a.getData(), b.getData(), c.getData(), d.getData(), n_row, n_sys);
     }
 
-    // Solves multiple independent cyclic tridiagonal systems
+    /**
+     * @brief Solve multiple cyclic tridiagonal systems.
+     * @param a Lower-diagonal (n_row × n_sys).
+     * @param b Diagonal (n_row × n_sys).
+     * @param c Upper-diagonal (n_row × n_sys).
+     * @param d RHS (n_row × n_sys), overwritten.
+     * @param n_row Rows per system.
+     * @param n_sys Number of systems.
+     */
     static void manyCyclic(dimArray<double>& a,
                            dimArray<double>& b,
                            dimArray<double>& c,
@@ -102,78 +89,38 @@ public:
                            const int n_row, const 
                            int n_sys) {
     
-        dimArray<double> e(n_row, n_sys);
-        std::vector<double> rr(n_sys);
-
-        for (int j = 0; j < n_sys; j++) {
-            e(1, j) = -a(1, j);
-            e(n_row - 1, j) = -c(n_row - 1, j);
-        }        
-    
-        for (int j = 0; j < n_sys; j++) {
-            d(1, j) /= b(1, j);
-            e(1, j) /= b(1, j);
-            c(1, j) /= b(1, j);
-        }
-    
-        for (int i = 2; i < n_row; i++) {
-            for (int j = 0; j < n_sys; j++) {
-                rr[j] = 1.0 / (b(i, j) - a(i, j) * c(i - 1, j));
-                d(i, j) = rr[j] * (d(i, j) - a(i, j) * d(i - 1, j));
-                e(i, j) = rr[j] * (e(i, j) - a(i, j) * e(i - 1, j));
-                c(i, j) = rr[j] * c(i, j);
-            }
-        }
-    
-        for (int i = n_row - 2; i >= 1; i--) {
-            for (int j = 0; j < n_sys; j++) {
-                d(i, j) -= c(i, j) * d(i + 1, j);
-                e(i, j) -= c(i, j) * e(i + 1, j);
-            }
-        }
-    
-        for (int j = 0; j < n_sys; j++) {
-            d(0, j) = (d(0, j) - a(0, j) * d(n_row - 1, j) - c(0, j) * d(1, j)) /
-                      (b(0, j) + a(0, j) * e(n_row - 1, j) + c(0, j) * e(1, j));
-        }
-    
-        for (int i = 1; i < n_row; i++) {
-            for (int j = 0; j < n_sys; j++) {
-                d(i, j) += d(0, j) * e(i, j);
-            }
-        }
+        manyCyclic(a.getData(), b.getData(), c.getData(), d.getData(), 
+                   n_row, n_sys);
     }
 
-    // Solves multiple independent tridiagonal systems stored row-wise
+    /**
+     * @brief Solve batched systems with common diagonals.
+     * @param a Lower-diagonal (size n).
+     * @param b Diagonal (size n).
+     * @param c Upper-diagonal (size n), overwritten.
+     * @param d RHS stored in dimArray (n_row × n_sys), overwritten.
+     * @param n_row Number of rows.
+     * @param n_sys Number of RHS vectors.
+     */    
     static void manyRHS(const std::vector<double>& a,
                               const std::vector<double>& b,
                               std::vector<double>& c,
                               dimArray<double>& d,
                               const int n_row, 
                               const int n_sys) {
-    
-        for (int j = 0; j < n_sys; j++) {
-            d(0, j) /= b[0];
-        }
-        c[0] /= b[0];
 
-        double r = 0.0;
-    
-        for (int i = 1; i < n_row; i++) {
-            r = 1.0 / (b[i] - a[i] * c[i - 1]);
-            for (int j = 0; j < n_sys; j++) {
-                d(i, j) = r * (d(i, j) - a[i] * d(i - 1, j));
-            }
-            c[i] = r * c[i];
-        }
-    
-        for (int i = n_row - 2; i >= 0; i--) {
-            for (int j = 0; j < n_sys; j++) {
-                d(i, j) -= c[i] * d(i + 1, j);
-            }
-        }
+        manyRHS(a.data(), b.data(), c.data(), d.getData(), n_row, n_sys);
     }
-    // Solves multiple independent tridiagonal systems stored row-wise
+
+    /**
+     * @brief Solve batched cyclic systems with common diagonals.
+     * @param a Lower-diagonal (size n).
+     * @param b Diagonal (size n).
+     * @param c Upper-diagonal (size n), overwritten.
+     * @param d RHS stored in dimArray (n_row × n_sys), overwritten.
+     * @param n_row Number of rows.
+     * @param n_sys Number of RHS vectors.
+     */
     static void manyRHSCyclic(const std::vector<double>& a,
                               const std::vector<double>& b,
                               std::vector<double>& c,
@@ -181,97 +128,62 @@ public:
                               const int n_row, 
                               const int n_sys) {
     
-        std::vector<double> e(n_row, 0.0);
-
-        e[1] = -a[1];
-        e[n_row - 1] = -c[n_row - 1];
-    
-        for (int j = 0; j < n_sys; j++) {
-            d(1, j) /= b[1];
-        }
-        e[1] /= b[1];
-        c[1] /= b[1];
-
-        for (int i = 2; i < n_row; i++) {
-            double rr = 1.0 / (b[i] - a[i] * c[i - 1]);
-            for (int j = 0; j < n_sys; j++) {
-                d(i, j) = rr * (d(i, j) - a[i] * d(i - 1, j));
-            }
-            e[i] = rr * (e[i] - a[i] * e[i - 1]);
-            c[i] = rr * c[i];
-        }
-    
-        for (int i = n_row - 2; i >= 1; i--) {
-            for (int j = 0; j < n_sys; j++) {
-                d(i, j) -= c[i] * d(i + 1, j);
-            }
-            e[i] -= c[i] * e[i + 1];
-        }
-    
-        for (int j = 0; j < n_sys; j++) {
-            d(0, j) = (d(0, j) - a[0] * d(n_row - 1, j) - c[0] * d(1, j)) /
-                         (b[0] + a[0] * e[n_row - 1] + c[0] * e[1]);
-        }
-    
-        for (int i = 1; i < n_row; i++) {
-            for (int j = 0; j < n_sys; j++) {
-                d(i, j) += d(0, j) * e[i];
-            }
-        }
+        manyRHSCyclic(a.data(), b.data(), c.data(), d.getData(), n_row, n_sys);
     }
 
 // Pointer-based TDMASolver (For zero-copy version)
 
-    static void single(const double* A, 
-                       const double* B, 
-                       double* C, 
-                       double* D, 
+    // 1. Single tridiagonal system
+    static void single(const double* a, 
+                       const double* b, 
+                       double* c, 
+                       double* d, 
                        const int n) {
-        C[0] /= B[0];
-        D[0] /= B[0];
+        c[0] /= b[0];
+        d[0] /= b[0];
         for (int i = 1; i < n; i++) {
-            double m = 1.0 / (B[i] - A[i] * C[i - 1]);
-            D[i] = m * (D[i] - A[i] * D[i - 1]);
-            C[i] *= m;
+            double m = 1.0 / (b[i] - a[i] * c[i - 1]);
+            d[i] = m * (d[i] - a[i] * d[i - 1]);
+            c[i] *= m;
         }
         for (int i = n - 2; i >= 0; --i) {
-            D[i] -= C[i] * D[i + 1];
+            d[i] -= c[i] * d[i + 1];
         }
     }
 
     // 2. Cyclic tridiagonal system
-    static void singleCyclic(const double* A, 
-                             const double* B, 
-                             double* C, 
-                             double* D, 
+    static void singleCyclic(const double* a, 
+                             const double* b, 
+                             double* c, 
+                             double* d, 
                              const int n) {
         assert(n > 2);
         double* e = new double[n]();
 
-        e[1] = -A[1];
-        e[n - 1] = -C[n - 1];
+        e[1] = -a[1];
+        e[n - 1] = -c[n - 1];
 
-        D[1] /= B[1];
-        e[1] /= B[1];
-        C[1] /= B[1];
+        d[1] /= b[1];
+        e[1] /= b[1];
+        c[1] /= b[1];
 
         for (int i = 2; i < n; i++) {
-            double r = 1.0 / (B[i] - A[i] * C[i - 1]);
-            D[i] = r * (D[i] - A[i] * D[i - 1]);
-            e[i] = r * (e[i] - A[i] * e[i - 1]);
-            C[i] *= r;
+            double r = 1.0 / (b[i] - a[i] * c[i - 1]);
+            d[i] = r * (d[i] - a[i] * d[i - 1]);
+            e[i] = r * (e[i] - a[i] * e[i - 1]);
+            c[i] *= r;
         }
 
         for (int i = n - 2; i >= 1; --i) {
-            D[i] -= C[i] * D[i + 1];
-            e[i] -= C[i] * e[i + 1];
+            d[i] -= c[i] * d[i + 1];
+            e[i] -= c[i] * e[i + 1];
         }
 
-        D[0] = (D[0] - A[0] * D[n - 1] - C[0] * D[1]) /
-               (B[0] + A[0] * e[n - 1] + C[0] * e[1]);
+        d[0] = (d[0] - a[0] * d[n - 1] - c[0] * d[1]) /
+               (b[0] + a[0] * e[n - 1] + c[0] * e[1]);
 
         for (int i = 1; i < n; i++) {
-            D[i] += D[0] * e[i];
+            d[i] += d[0] * e[i];
         }
 
         delete[] e;

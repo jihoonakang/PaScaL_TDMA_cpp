@@ -1,3 +1,11 @@
+/**
+ * @file PaScaL_TDMA.hpp
+ * @brief High-level planner and solver dispatch for PaScaL_TDMA library.
+ *
+ * Defines plan classes for different TDMA batch types and solver wrappers
+ * that execute on CPU or GPU backends across an MPI communicator.
+ */
+
 #pragma once
 
 #include <vector>
@@ -7,195 +15,238 @@
 
 namespace PaScaL_TDMA {
 
-    enum class TDMAType {
-        Standard,
-        Cyclic
-    };
+/// Type of TDMA solver: standard or cyclic (periodic)
+enum class TDMAType { Standard, Cyclic };
 
-    enum class BatchType {
-        Single,
-        Many,
-        ManyRHS
-    };
+/// Batch execution mode: single system, many systems, or many RHS vectors
+enum class BatchType { Single, Many, ManyRHS };
 
-    class PTDMAPlanBase {
-    
-    protected:
-        MPI_Comm comm_ptdma = MPI_COMM_NULL;
-        int rank = 0;
-        int size = 1;
+// ───────────────── Plans ──────────────────────────────────────────────
+/**
+ * @class PTDMAPlanBase
+ * @brief Base class for TDMA execution plans managing MPI exchange metadata.
+ */
+class PTDMAPlanBase {
 
-        std::vector<int> count_send, displ_send;
-        std::vector<int> count_recv, displ_recv;
-        TDMAType type;
+protected:
+    MPI_Comm comm_ptdma_ = MPI_COMM_NULL;   ///< Sub-communicator for TDMA
+    int rank_ = 0;                          ///< Rank in comm_ptdma
+    int size_ = 1;                          ///< Size of comm_ptdma
 
-    public:
-        virtual ~PTDMAPlanBase() = default;
+    std::vector<int> count_send_;           ///< Send counts for reduced system
+    std::vector<int> displ_send_;           ///< Send displs for reduced system
+    std::vector<int> count_recv_;           ///< Recv counts for transpose
+    std::vector<int> displ_recv_;           ///< Recv displs for transpose
+    TDMAType type_;                         ///< Solver type
 
-        virtual void create(int n_row_, MPI_Comm comm_ptdma_, TDMAType type_);
-        virtual void create(int n_row_, int n_sys_, MPI_Comm comm_ptdma_, 
-                            TDMAType type_);
-        virtual void create(int n_row_, int n_sys_, MPI_Comm comm_ptdma_);
+public:
+    virtual ~PTDMAPlanBase() = default;
 
-        virtual void destroy() = 0;
-        inline int getMPIRank() const { return rank; };
-        inline int getMPISize() const { return size; };
-    };
+    /**
+     * @brief Initialize plan for single or cyclic single system.
+     * @param n_row         Number of rows per system.
+     * @param comm_ptdma    Parent MPI communicator.
+     * @param type          TDMA solver type.
+     */
+    virtual void create(int n_row, MPI_Comm comm_ptdma, TDMAType type);
 
-    // ──────────────────────────────────────────────────────────────
+    /**
+     * @brief Initialize plan for batched systems with system count.
+     * @param n_row         Number of rows per system.
+     * @param n_sys         Number of systems or RHS.
+     * @param comm_ptdma    Parent MPI communicator.
+     * @param type          TDMA solver type.
+     */
+    virtual void create(int n_row, int n_sys, MPI_Comm comm_ptdma, 
+                        TDMAType type);
 
-    class PTDMAPlanSingle : public PTDMAPlanBase {
+    /// Destroy plan and free MPI datatypes
+    virtual void destroy() = 0;
+
+    /// Get MPI rank in TDMA communicator
+    inline int getMPIRank() const noexcept { return rank_; };
+    /// Get MPI size in TDMA communicator
+    inline int getMPISize() const noexcept { return size_; };
+};
+
+/**
+ * @class PTDMAPlanSingle
+ * @brief Plan for single-system TDMA across multiple ranks.
+ */
+class PTDMAPlanSingle : public PTDMAPlanBase {
 
     friend class PTDMASolverSingle;
 
-    private:
-        int n_row = 0;
-        int n_row_rt = 0;
-        int root_rank = 0;
+private:
+    int n_row_    = 0;      ///< Local rows per rank
+    int n_row_rt_ = 0;      ///< Local rows after gathering reduced systems
+    int root_rank_ = 0;     ///< Root rank for gather/scatter
 
-        std::vector<double> A_rd, B_rd, C_rd, D_rd;
-        std::vector<double> A_rt, B_rt, C_rt, D_rt;
+    std::vector<double> a_rd_, b_rd_, c_rd_, d_rd_; ///< For reduces system
+    std::vector<double> a_rt_, b_rt_, c_rt_, d_rt_; ///< For transposed system
 
-    public:
-        using PTDMAPlanBase::create;
-        void create(int n_row_, MPI_Comm comm_ptdma_, TDMAType type_) override;
-        void destroy() override;
+public:
+    using PTDMAPlanBase::create;
+    void create(int n_row, MPI_Comm comm_ptdma, TDMAType type) override;
+    void destroy() override;
 
-        inline int getRowSize() const { return n_row; };
-        inline int getRootRank() const { return root_rank; };
-    };
+    inline int getRowSize() const noexcept { return n_row_; }
+    inline int getRootRank() const noexcept { return root_rank_; }
+};
 
-    // ──────────────────────────────────────────────────────────────
-
-    class PTDMAPlanMany : public PTDMAPlanBase {
+/**
+ * @class PTDMAPlanMany
+ * @brief Plan for multiple independent TDMA systems.
+ */
+class PTDMAPlanMany : public PTDMAPlanBase {
 
     friend class PTDMASolverMany;
 
-    private:
-        int n_sys = 0;
-        int n_row = 0;
-        int n_sys_rt = 0;
-        int n_row_rt = 0;
+private:
+    int n_row_ = 0;     ///< Local rows per system
+    int n_sys_ = 0;     ///< Number of systems
+    int n_row_rt_ = 0;   ///< Local rows after transpose
+    int n_sys_rt_ = 0;   ///< Number of systems after transpose
 
-        std::vector<MPI_Datatype> ddtype_FS, ddtype_BS;
-        dimArray<double> A_rd, B_rd, C_rd, D_rd;
-        dimArray<double> A_rt, B_rt, C_rt, D_rt;
+    std::vector<MPI_Datatype> ddtype_rd_;   ///< MPI types for reduced system
+    std::vector<MPI_Datatype> ddtype_rt_;   ///< MPI types for transposed system
 
-    public:
-        using PTDMAPlanBase::create;
-        void create(int n_row_, int n_sys_, MPI_Comm comm_ptdma_, 
-                    TDMAType type_) override;
-        void destroy() override;
+    dimArray<double> a_rd_, b_rd_, c_rd_, d_rd_;    ///< For reduces system
+    dimArray<double> a_rt_, b_rt_, c_rt_, d_rt_;    ///< For transposed system
 
-        inline int getRowSize() const { return n_row; };
-        inline int getSysSize() const { return n_sys; };
-    };
+public:
+    using PTDMAPlanBase::create;
+    void create(int n_row, int n_sys, MPI_Comm comm_ptdma, 
+                TDMAType type) override;
+    void destroy() override;
 
-    // ──────────────────────────────────────────────────────────────
+    inline int getRowSize() const noexcept { return n_row_; };
+    inline int getSysSize() const noexcept { return n_sys_; };
+};
 
-    class PTDMAPlanManyRHS : public PTDMAPlanBase {
+/**
+ * @class PTDMAPlanManyRHS
+ * @brief Plan for batched RHS TDMA with shared diagonals.
+ */
+class PTDMAPlanManyRHS : public PTDMAPlanBase {
 
     friend class PTDMASolverManyRHS;
 
-    private:
-        int n_sys = 0;
-        int n_row = 0;
-        int n_sys_rt = 0;
-        int n_row_rt = 0;
+private:
+    int n_row_ = 0;     ///< Local rows per system
+    int n_sys_ = 0;     ///< Number of systems
+    int n_row_rt_ = 0;   ///< Local rows after transpose
+    int n_sys_rt_ = 0;   ///< Number of systems after transpose
 
-        std::vector<MPI_Datatype> ddtype_FS, ddtype_BS;
+    std::vector<MPI_Datatype> ddtype_rd_;   ///< MPI types for reduced system
+    std::vector<MPI_Datatype> ddtype_rt_;   ///< MPI types for transposed system
 
-        std::vector<double> A_rd, B_rd, C_rd;
-        dimArray<double> D_rd;
+    std::vector<double> a_rd_, b_rd_, c_rd_;   ///< For reduces system
+    dimArray<double> d_rd_;                  ///< For reduces system, RHS
 
-        std::vector<double> A_rt, B_rt, C_rt;
-        dimArray<double> D_rt;
+    std::vector<double> a_rt_, b_rt_, c_rt_;   ///< For transposed system
+    dimArray<double> d_rt_;                  ///< For transposed system, RHS
 
-    public:
-        using PTDMAPlanBase::create;
-        void create(int n_row_, int n_sys_, MPI_Comm comm_ptdma_, 
-                    TDMAType type_) override;
-        void destroy() override;
+public:
+    using PTDMAPlanBase::create;
+    void create(int n_row, int n_sys, MPI_Comm comm_ptdma, 
+                TDMAType type) override;
+    void destroy() override;
 
-        inline int getRowSize() const { return n_row; };
-        inline int getSysSize() const { return n_sys; };
-    };
+    inline int getRowSize() const { return n_row_; };
+    inline int getSysSize() const { return n_sys_; };
+};
 
-    // ──────────────────────────────────────────────────────────────
+// ───────────────── Solvers ──────────────────────────────────────────────
 
-    class PTDMAPlanManyThreadTeam : public PTDMAPlanBase {
+/**
+ * @class PTDMASolverSingle
+ * @brief Executes single-system TDMA based on plan.
+ */
+class PTDMASolverSingle {
+public:
+    static void solve(PTDMAPlanSingle& plan, 
+                      double* a, double* b, double* c, double* d);
 
-    public:
-        int n_sys = 0;
-        int n_row = 0;
-        int n_sys_rt = 0;
-        int n_row_rt = 0;
+    // Inline wrapper: defined here
+    static inline void solve(PTDMAPlanSingle& plan, 
+                             std::vector<double>& a, std::vector<double>& b, 
+                             std::vector<double>& c, std::vector<double>& d) 
+    { solve(plan, a.data(), b.data(), c.data(), d.data()); }
 
-        using PTDMAPlanBase::create;
-        void create(int n_row_, int n_sys_, MPI_Comm comm_ptdma_) override;
-        void destroy() override;
-    };
+};
 
-    class PTDMASolverSingle {
-    public:
-        static void solve(PTDMAPlanSingle& plan, 
-                          double* A, double* B, double* C, double* D);
+/**
+ * @class PTDMASolverMany
+ * @brief Executes many independent TDMA systems based on plan.
+ */
+class PTDMASolverMany {
+public:
+    static void solve(PTDMAPlanMany& plan,
+                      double* a, double* b, double* c, double* d);
 
-        // Inline wrapper: defined here
-        static inline void solve(PTDMAPlanSingle& plan, 
-                                 std::vector<double>& A, std::vector<double>& B, 
-                                 std::vector<double>& C, std::vector<double>& D) 
-        { solve(plan, A.data(), B.data(), C.data(), D.data()); }
+    // Inline wrapper
+    static inline void solve(PTDMAPlanMany& plan, 
+                             dimArray<double>& a, dimArray<double>& b, 
+                             dimArray<double>& c, dimArray<double>& d)
+    { solve(plan, a.getData(), b.getData(), c.getData(), d.getData()); }
 
-    };
+    static inline void solve(PTDMAPlanMany& plan, 
+                             std::vector<double>& a, std::vector<double>& b, 
+                             std::vector<double>& c, std::vector<double>& d)
+    { solve(plan, a.data(), b.data(), c.data(), d.data()); }
+};
 
-    class PTDMASolverMany {
-    public:
-        static void solve(PTDMAPlanMany& plan,
-                          double* A, double* B, double* C, double* D);
+/**
+ * @class PTDMASolverManyRHS
+ * @brief Executes RHS-batched TDMA systems based on plan.
+ */
+class PTDMASolverManyRHS {
+public:
+    static void solve(PTDMAPlanManyRHS& plan, 
+                      double* a, double* b, double* c, double* d);
 
-        // Inline wrapper
-        static inline void solve(PTDMAPlanMany& plan, 
-                                 dimArray<double>& A, dimArray<double>& B, 
-                                 dimArray<double>& C, dimArray<double>& D)
-        { solve(plan, A.getData(), B.getData(), C.getData(), D.getData()); }
+    // Inline wrapper
+    static inline void solve(PTDMAPlanManyRHS& plan, 
+                             std::vector<double>& a, std::vector<double>& b, 
+                             std::vector<double>& c, dimArray<double>& d)
+    { solve(plan, a.data(), b.data(), c.data(), d.getData()); }
 
-        static inline void solve(PTDMAPlanMany& plan, 
-                                 std::vector<double>& A, std::vector<double>& B, 
-                                 std::vector<double>& C, std::vector<double>& D)
-        { solve(plan, A.data(), B.data(), C.data(), D.data()); }
-    };
+    static inline void solve(PTDMAPlanManyRHS& plan, 
+                             std::vector<double>& a, std::vector<double>& b, 
+                             std::vector<double>& c, std::vector<double>& d)
+    { solve(plan, a.data(), b.data(), c.data(), d.data()); }
+};
 
-    class PTDMASolverManyRHS {
-    public:
-        static void solve(PTDMAPlanManyRHS& plan, 
-                          double* A, double* B, double* C, double* D);
+// ───────────────── Dispatch Helpers ─────────────────────────────────────
 
-        // Inline wrapper
-        static inline void solve(PTDMAPlanManyRHS& plan, 
-                                 std::vector<double>& A, std::vector<double>& B, 
-                                 std::vector<double>& C, dimArray<double>& D)
-        { solve(plan, A.data(), B.data(), C.data(), D.getData()); }
-
-        static inline void solve(PTDMAPlanManyRHS& plan, 
-                                 std::vector<double>& A, std::vector<double>& B, 
-                                 std::vector<double>& C, std::vector<double>& D)
-        { solve(plan, A.data(), B.data(), C.data(), D.data()); }
-    };
-
-
+    /// Dispatch solver based on batch and tdma type
     template <BatchType batch_type>
-    void dispatchTDMASolver(TDMAType type, double* A, double* B, double* C, double* D, int n_row, int n_sys);
+    void dispatchTDMASolver(TDMAType type, 
+                            double* a, double* b, double* c, double* d, 
+                            int n_row, int n_sys);
 
     template <TDMAType tdma_type, BatchType batch_type>
-    void batchSolver(double* A, double* B, double* C, double* D, int n_row, int n_sys);
+    void batchSolver(double* a, double* b, double* c, double* d, 
+                     int n_row, int n_sys);
 
-    extern template void batchSolver<TDMAType::Standard, BatchType::Single>(double*, double*, double*, double*, int, int);
-    extern template void batchSolver<TDMAType::Cyclic, BatchType::Single>(double*, double*, double*, double*, int, int);
-    extern template void batchSolver<TDMAType::Standard, BatchType::Many>(double*, double*, double*, double*, int, int);
-    extern template void batchSolver<TDMAType::Cyclic, BatchType::Many>(double*, double*, double*, double*, int, int);
-    extern template void batchSolver<TDMAType::Standard, BatchType::ManyRHS>(double*, double*, double*, double*, int, int);
-    extern template void batchSolver<TDMAType::Cyclic, BatchType::ManyRHS>(double*, double*, double*, double*, int, int);
+    /// Explicit instantiations for combinations
+    extern template void batchSolver<TDMAType::Standard, BatchType::Single>(
+        double*, double*, double*, double*, int, int);
 
+    extern template void batchSolver<TDMAType::Cyclic, BatchType::Single>(
+        double*, double*, double*, double*, int, int);
+
+    extern template void batchSolver<TDMAType::Standard, BatchType::Many>(
+        double*, double*, double*, double*, int, int);
+
+    extern template void batchSolver<TDMAType::Cyclic, BatchType::Many>(
+        double*, double*, double*, double*, int, int);
+
+    extern template void batchSolver<TDMAType::Standard, BatchType::ManyRHS>(
+        double*, double*, double*, double*, int, int);
+
+    extern template void batchSolver<TDMAType::Cyclic, BatchType::ManyRHS>(
+        double*, double*, double*, double*, int, int);
 
 } // namespace PaScaL_TDMA
