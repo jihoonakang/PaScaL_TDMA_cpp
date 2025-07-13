@@ -5,6 +5,7 @@
 
 #include <cuda_runtime.h>
 #include <cassert>
+#include "config.hpp"
 #include "TDMASolver.cuh"
 
 /**
@@ -112,7 +113,7 @@ void cuTDMASolver::cuMany(const double* a_d, const double* b_d,
     assert(nz > 1 && ny > 0 && nx > 0);
 
     // Launch configuration
-    dim3 threads(8, 8);
+    dim3 threads(THREAD_X, THREAD_Y);
     dim3 blocks((nz + threads.x - 1) / threads.x,
                 (ny + threads.y - 1) / threads.y);
 
@@ -276,7 +277,7 @@ void cuTDMASolver::cuManyCyclic(const double* a_d, const double* b_d,
     cudaMalloc(&e_d, nx * ny * nz * sizeof(double));
 
     // Launch configuration
-    dim3 threads(8, 8);
+    dim3 threads(THREAD_X, THREAD_Y);
     dim3 blocks((nz + threads.x - 1) / threads.x,
                 (ny + threads.y - 1) / threads.y);
 
@@ -387,7 +388,7 @@ void cuTDMASolver::cuManyRHS(const double* a_d, const double* b_d,
     assert(nx > 1 && ny > 0 && nz > 0);
 
     // Launch configuration
-    dim3 threads(8, 8);
+    dim3 threads(THREAD_X, THREAD_Y);
     dim3 blocks((nz + threads.x - 1) / threads.x,
                 (ny + threads.y - 1) / threads.y);
 
@@ -526,7 +527,7 @@ void cuTDMASolver::cuManyRHSCyclic(const double* a_d, const double* b_d, double*
     assert(nx > 2 && ny > 0 && nz > 0);
 
     // Launch configuration
-    dim3 threads(8, 8);
+    dim3 threads(THREAD_X, THREAD_Y);
     dim3 blocks((nz + threads.x - 1) / threads.x,
                 (ny + threads.y - 1) / threads.y);
 

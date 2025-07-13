@@ -37,6 +37,7 @@ if(CUDA)
     set(CUDA_TOOLKIT_ROOT_DIR /usr/local/cuda) # adjust path as needed
     include_directories(${CUDA_INCLUDE_DIRS})
     target_compile_definitions(PaScaL_TDMA PRIVATE CUDA)
+    add_compile_options(-DCUDA)
 
     if(CUDA_AWARE_MPI)
         message(STATUS "CUDA-Aware MPI support: ENABLED")
