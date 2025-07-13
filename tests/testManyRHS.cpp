@@ -1,3 +1,11 @@
+/**
+ * @file testManyRHS.cpp
+ * @brief Unit test for distributed 3D TDMA (multiple right-hand sides) using MPI and GoogleTest.
+ *
+ * This test solves a 3D problem using TDMA sweeps along each dimension, distributed among MPI processes.
+ * The known analytical solution is compared with the computed result for validation.
+ */
+
 #include <gtest/gtest.h>
 #include <vector>
 #include <cmath>
@@ -17,128 +25,18 @@ constexpr double a_lower = -1.0;
 
 using namespace PaScaL_TDMA;
 
-void generateRHS(dimArray<double>& D, dimArray<double>& X, 
-                 int Nx, int Ny, int Nz);
-
-void distributeRHS(dimArray<double>& d_sub, const dimArray<double>& d,
-                    const DomainLayout3D& dom, const CommLayout2D& topo);
-
-TEST(PaScaL_TDMA_many, Solve) {
-
-    // Read from global argc/argv (GoogleTest doesn't pass arguments to TEST directly)
-    extern int g_argc;
-    extern char** g_argv;
-
-    if (g_argc != 4)
-        throw std::runtime_error("Usage: testMany <nx> <ny> <nz>");
-
-    const int nx = std::stoi(g_argv[1]);
-    const int ny = std::stoi(g_argv[2]);
-    const int nz = std::stoi(g_argv[3]);
-    ::testing::Test::RecordProperty("nx", nx);
-    ::testing::Test::RecordProperty("ny", ny);
-    ::testing::Test::RecordProperty("nz", nz);
-
-    if (nx < 10 || nx > 10000)
-        throw std::runtime_error("Recommendation of 10 <= nx <= 10,000");
-
-    if (ny < 10 || ny > 10000)
-        throw std::runtime_error("Recommendation of 10 <= ny <= 10,000");
-
-    if (nz < 10 || nz > 10000)
-        throw std::runtime_error("Recommendation of 10 <= nz <= 10,000");
-
-    int rank, size;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
-    bool is_root = (rank == 0);
-
-    int dims[2] = {0, 0};
-    int period[2] = {0, 0};
-
-    MPI_Dims_create(size, 2, dims);
-
-    CommLayout2D topo(dims, period);
-    DomainLayout3D dom(nx, ny, nz, topo);
-
-    const int nx_sub = dom.getParDimX();
-    const int ny_sub = dom.getParDimY();
-
-    topo.buildCommBufferInfo(nx_sub, ny_sub, nz);
-
-    dimArray<double> D, X;
-    if (is_root) {
-        D.resize(nx, ny, nz);
-        X.resize(nx, ny, nz);
-        generateRHS(D, X, nx, ny, nz);
-    }
-
-    dimArray<double> d_sub(nx_sub, ny_sub, nz), x_sub(nx_sub, ny_sub, nz);
-    distributeRHS(d_sub, D, dom, topo);
-    distributeRHS(x_sub, X, dom, topo);
-
-// Solve in x-direction
-    std::vector ax(nx_sub, a_lower);
-    std::vector bx(nx_sub, a_diag);
-    std::vector cx(nx_sub, a_upper);
-
-    PTDMAPlanManyRHS px_many;
-    px_many.create(nx_sub, ny_sub * nz, topo.getCommX(), TDMAType::Cyclic);
-    d_sub.convert2D(nx_sub, ny_sub * nz);
-    PTDMASolverManyRHS::solve(px_many, ax, bx, cx, d_sub);
-    px_many.destroy();
-
-    // Solve in y-direction
-    std::vector ay(ny_sub, a_lower);
-    std::vector by(ny_sub, a_diag);
-    std::vector cy(ny_sub, a_upper);
-
-    dimArray<double> d_sub_tr(ny_sub, nx_sub, nz);
-
-    for (int i = 0; i < nx_sub; i++)
-        for (int j = 0; j < ny_sub; j++)
-            for (int k = 0; k < nz; k++)
-                d_sub_tr(j, i, k) = d_sub(i, j, k);
-
-    PTDMAPlanManyRHS py_many;
-    py_many.create(ny_sub, nx_sub * nz, topo.getCommY(), TDMAType::Standard);
-    d_sub_tr.convert2D(ny_sub, nx_sub * nz);
-    PTDMASolverManyRHS::solve(py_many, ay, by, cy, d_sub_tr);
-    py_many.destroy();
-
-    for (int i = 0; i < nx_sub; i++)
-        for (int j = 0; j < ny_sub; j++)
-            for (int k = 0; k < nz; k++)
-                d_sub(i, j, k) = d_sub_tr(j, i, k);
-
-    // Solve in z-direction
-    std::vector az(nz, a_lower);
-    std::vector bz(nz, a_diag);
-    std::vector cz(nz, a_upper);
-
-    d_sub_tr.resize(nz, nx_sub, ny_sub);
-
-    for (int i = 0; i < nx_sub; i++)
-        for (int j = 0; j < ny_sub; j++)
-            for (int k = 0; k < nz; k++)
-                d_sub_tr(k, i, j) = d_sub(i, j, k);
-
-    d_sub_tr.convert2D(nz, nx_sub * ny_sub);
-    TDMASolver::manyRHS(az, bz, cz, d_sub_tr, nz, nx_sub * ny_sub);
-
-    for (int i = 0; i < nx_sub; i++)
-        for (int j = 0; j < ny_sub; j++)
-            for (int k = 0; k < nz; k++)
-                d_sub(i, j, k) = d_sub_tr(k, i, j);
-
-    for (int i = 0; i < nx_sub; i++) {
-        for (int j = 0; j < ny_sub; j++)
-            for (int k = 0; k < nz; k++)
-                EXPECT_NEAR(d_sub(i, j, k), x_sub(i, j, k), tolerance) << 
-                    "Mismatch at (i,j,k) = (" <<i <<", "<<j<<", "<<k<<" )";
-    }
-}
-
+/**
+ * @brief Generates the right-hand side (RHS) and exact solution arrays for a 3D system.
+ *
+ * The function builds a known exact solution, applies TDMA operators along each dimension
+ * to construct the corresponding RHS for testing.
+ *
+ * @param[out] D  The generated RHS 3D array (Nx × Ny × Nz)
+ * @param[out] X  The exact solution 3D array (Nx × Ny × Nz)
+ * @param Nx      Number of grid points in x direction
+ * @param Ny      Number of grid points in y direction
+ * @param Nz      Number of grid points in z direction
+ */
 void generateRHS(dimArray<double>& D, dimArray<double>& X, 
                  int Nx, int Ny, int Nz) {
 
@@ -158,7 +56,7 @@ void generateRHS(dimArray<double>& D, dimArray<double>& X,
     dimArray<double> z(Nx, Ny, Nz);
 
     std::random_device rd;
-    std::mt19937 gen(rd());
+    std::mt19937 gen(0); // fixed seed for reproducibility
     std::uniform_real_distribution<> dis(0.0, 1.0);
 
     for (int i = 0; i < Nx; i++) 
@@ -222,6 +120,14 @@ void generateRHS(dimArray<double>& D, dimArray<double>& X,
                             + cx[Nx - 1] * z(0, j, k);
 }
 
+/**
+ * @brief Distributes a global 3D array into process-local blocks using MPI.
+ *
+ * @param[out] d_sub Local block of the distributed array (output)
+ * @param[in]  d     Global array on the root process (input)
+ * @param[in]  dom   3D domain decomposition information
+ * @param[in]  topo  2D communication topology (process grid)
+ */
 void distributeRHS(dimArray<double>& d_sub, const dimArray<double>& d,
                     const DomainLayout3D& dom, const CommLayout2D& topo) {
 
@@ -242,6 +148,7 @@ void distributeRHS(dimArray<double>& d_sub, const dimArray<double>& d,
     const int n_sub = dom.getParDimXYZ();
     const int nxyz = dom.getDimXYZ();
 
+    // Only root process prepares contiguous data for MPI_Scatterv
     if (myrank == 0) {
         int idx = 0;
         d_blk.resize(nxyz);
@@ -259,20 +166,155 @@ void distributeRHS(dimArray<double>& d_sub, const dimArray<double>& d,
         }
     }
 
+    // Scatter the blocks to each process
     std::vector<double> recv_blk(n_sub);
     MPI_Scatterv(d_blk.data(), cnt_all.data(), disp_all.data(),MPI_DOUBLE,
                  recv_blk.data(), n_sub, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
+    // Rebuild local 3D array from received block
     for (int i = 0; i < nx_sub; i++)
         for (int j = 0; j < ny_sub; j++)
             for (int k = 0; k < nz_sub; k++)
                 d_sub(i, j, k) = recv_blk[i * ny_sub * nz_sub + j * nz_sub + k];
 }
 
+/**
+ * @test
+ * @brief Distributed 3D TDMA test: solves in x, y, z directions and checks solution.
+ *
+ * This test reads grid size from command line, sets up 3D domain decomposition,
+ * distributes the RHS, applies sweeps along each dimension, and compares result with the exact solution.
+ *
+ * Command-line arguments:
+ * - nx: grid size in x direction
+ * - ny: grid size in y direction
+ * - nz: grid size in z direction
+ */
+TEST(PaScaL_TDMA_many, Solve) {
+
+    // Use global argc/argv as GoogleTest does not pass them directly
+    extern int g_argc;
+    extern char** g_argv;
+
+    if (g_argc != 4)
+        throw std::runtime_error("Usage: testMany <nx> <ny> <nz>");
+
+    const int nx = std::stoi(g_argv[1]);
+    const int ny = std::stoi(g_argv[2]);
+    const int nz = std::stoi(g_argv[3]);
+    ::testing::Test::RecordProperty("nx", nx);
+    ::testing::Test::RecordProperty("ny", ny);
+    ::testing::Test::RecordProperty("nz", nz);
+
+    if (nx < 10 || nx > 10000)
+        throw std::runtime_error("Recommendation of 10 <= nx <= 10,000");
+
+    if (ny < 10 || ny > 10000)
+        throw std::runtime_error("Recommendation of 10 <= ny <= 10,000");
+
+    if (nz < 10 || nz > 10000)
+        throw std::runtime_error("Recommendation of 10 <= nz <= 10,000");
+
+    int rank, size;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    bool is_root = (rank == 0);
+
+    int dims[2] = {0, 0};
+    int period[2] = {0, 0};
+
+    MPI_Dims_create(size, 2, dims);
+
+    CommLayout2D topo(dims, period);
+    DomainLayout3D dom(nx, ny, nz, topo);
+
+    const int nx_sub = dom.getParDimX();
+    const int ny_sub = dom.getParDimY();
+
+    topo.buildCommBufferInfo(nx_sub, ny_sub, nz);
+
+    dimArray<double> D, X;
+    if (is_root) {
+        D.resize(nx, ny, nz);
+        X.resize(nx, ny, nz);
+        generateRHS(D, X, nx, ny, nz);
+    }
+
+    dimArray<double> d_sub(nx_sub, ny_sub, nz), x_sub(nx_sub, ny_sub, nz);
+    distributeRHS(d_sub, D, dom, topo);
+    distributeRHS(x_sub, X, dom, topo);
+
+    // =====[ Solve in x-direction ]=====
+    std::vector ax(nx_sub, a_lower);
+    std::vector bx(nx_sub, a_diag);
+    std::vector cx(nx_sub, a_upper);
+
+    PTDMAPlanManyRHS px_many;
+    px_many.create(nx_sub, ny_sub * nz, topo.getCommX(), TDMAType::Cyclic);
+    d_sub.convert2D(nx_sub, ny_sub * nz);
+    PTDMASolverManyRHS::solve(px_many, ax, bx, cx, d_sub);
+    px_many.destroy();
+
+    // =====[ Solve in y-direction ]=====
+    std::vector ay(ny_sub, a_lower);
+    std::vector by(ny_sub, a_diag);
+    std::vector cy(ny_sub, a_upper);
+
+    dimArray<double> d_sub_tr(ny_sub, nx_sub, nz);
+
+    for (int i = 0; i < nx_sub; i++)
+        for (int j = 0; j < ny_sub; j++)
+            for (int k = 0; k < nz; k++)
+                d_sub_tr(j, i, k) = d_sub(i, j, k);
+
+    PTDMAPlanManyRHS py_many;
+    py_many.create(ny_sub, nx_sub * nz, topo.getCommY(), TDMAType::Standard);
+    d_sub_tr.convert2D(ny_sub, nx_sub * nz);
+    PTDMASolverManyRHS::solve(py_many, ay, by, cy, d_sub_tr);
+    py_many.destroy();
+
+    for (int i = 0; i < nx_sub; i++)
+        for (int j = 0; j < ny_sub; j++)
+            for (int k = 0; k < nz; k++)
+                d_sub(i, j, k) = d_sub_tr(j, i, k);
+
+    // =====[ Solve in z-direction ]=====
+    std::vector az(nz, a_lower);
+    std::vector bz(nz, a_diag);
+    std::vector cz(nz, a_upper);
+
+    d_sub_tr.resize(nz, nx_sub, ny_sub);
+
+    for (int i = 0; i < nx_sub; i++)
+        for (int j = 0; j < ny_sub; j++)
+            for (int k = 0; k < nz; k++)
+                d_sub_tr(k, i, j) = d_sub(i, j, k);
+
+    d_sub_tr.convert2D(nz, nx_sub * ny_sub);
+    TDMASolver::manyRHS(az, bz, cz, d_sub_tr, nz, nx_sub * ny_sub);
+
+    for (int i = 0; i < nx_sub; i++)
+        for (int j = 0; j < ny_sub; j++)
+            for (int k = 0; k < nz; k++)
+                d_sub(i, j, k) = d_sub_tr(k, i, j);
+
+    // =====[ Solution Verification ]=====
+    for (int i = 0; i < nx_sub; i++) {
+        for (int j = 0; j < ny_sub; j++)
+            for (int k = 0; k < nz; k++)
+                EXPECT_NEAR(d_sub(i, j, k), x_sub(i, j, k), tolerance) << 
+                    "Mismatch at (i,j,k) = (" <<i <<", "<<j<<", "<<k<<" )";
+    }
+}
 
 int g_argc;
 char** g_argv;
 
+/**
+ * @brief Main entry point for MPI+GoogleTest runs.
+ *
+ * Initializes MPI, passes arguments to tests, runs all tests, and finalizes MPI.
+ */
 int main(int argc, char** argv) {
     MPI_Init(&argc, &argv);
     g_argc = argc;

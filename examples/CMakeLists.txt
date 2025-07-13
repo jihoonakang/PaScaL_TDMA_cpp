@@ -20,6 +20,6 @@ add_pascal_example(manyRHS_example   manyRHS.cpp)
 
 # CUDA examples
 if(CUDA)
-    add_cuda_example(cuMany     cuManyTest.cpp)
-    add_cuda_example(cuManyRHS  cuManyRHSTest.cpp)
+    add_cuda_example(cuMany     cuMany.cpp)
+    add_cuda_example(cuManyRHS  cuManyRHS.cpp)
 endif()

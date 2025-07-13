@@ -1,3 +1,10 @@
+/**
+ * @file testCuMany.cpp
+ * @brief Unit test for GPU-accelerated distributed TDMA (many right-hand sides) using cuPaScaL_TDMA, MPI, and GoogleTest.
+ *
+ * This test compares the results of the CPU (PaScaL_TDMA) and GPU (cuPaScaL_TDMA) solvers for consistency.
+ */
+
 #include <gtest/gtest.h>
 #include <iostream>
 #include <vector>
@@ -11,6 +18,19 @@ constexpr double tolerance = 1e-12;
 constexpr double a_diag = 10.0;
 constexpr double a_upper = -1.0;
 constexpr double a_lower = -1.0;
+
+/**
+ * @test
+ * @brief GPU-accelerated distributed TDMA: compare CPU and GPU solver results.
+ *
+ * Reads problem size from command line, allocates/initializes data, solves with both CPU and GPU,
+ * and checks the results for numerical agreement.
+ *
+ * Command-line arguments:
+ * - nx_sub: Number of grid points in x direction (per process)
+ * - ny:     Number of grid points in y direction
+ * - nz:     Number of grid points in z direction
+ */
 
 TEST(cuPaScaL_TDMA_many, Solve) {
 
@@ -44,11 +64,13 @@ TEST(cuPaScaL_TDMA_many, Solve) {
 
     const int N = nx_sub * ny * nz;
 
-    std::vector<double> h_a(N, a_lower);
-    std::vector<double> h_b(N,  a_diag);
-    std::vector<double> h_c(N, a_upper);
-    std::vector<double> h_d(N);
+    // Host arrays for coefficients and solution vector
+    std::vector<double> a_h(N, a_lower);
+    std::vector<double> b_h(N,  a_diag);
+    std::vector<double> c_h(N, a_upper);
+    std::vector<double> d_h(N);
 
+    // Initialize CUDA environment and print CUDA-aware MPI availability
     cudaEnv::initialize();
 
     if (cudaEnv::isCudaAwareMPI()) {
@@ -57,55 +79,64 @@ TEST(cuPaScaL_TDMA_many, Solve) {
         if (is_root) std::cout << "[INFO] CUDA-Aware MPI is NOT available." << std::endl;
     }
 
+    // Fill the right-hand side with a known function (e.g., sine)
     for (int i = 0; i < N; i++) {
-        h_d[i] = std::sin(i);
+        d_h[i] = std::sin(i);
     }
 
-    // GPU memory allocation
-    double *d_a, *d_b, *d_c, *d_d;
-    cudaMalloc((void**)&d_a, N * sizeof(double));
-    cudaMalloc((void**)&d_b, N * sizeof(double));
-    cudaMalloc((void**)&d_c, N * sizeof(double));
+    // Allocate device (GPU) memory and copy values in host memory
+    double *a_d, *b_d, *c_d, *d_d;
+    cudaMalloc((void**)&a_d, N * sizeof(double));
+    cudaMalloc((void**)&b_d, N * sizeof(double));
+    cudaMalloc((void**)&c_d, N * sizeof(double));
     cudaMalloc((void**)&d_d, N * sizeof(double));
 
-    cudaMemcpy(d_a, h_a.data(), N * sizeof(double), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_b, h_b.data(), N * sizeof(double), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_c, h_c.data(), N * sizeof(double), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_d, h_d.data(), N * sizeof(double), cudaMemcpyHostToDevice);
+    cudaMemcpy(a_d, a_h.data(), N * sizeof(double), cudaMemcpyHostToDevice);
+    cudaMemcpy(b_d, b_h.data(), N * sizeof(double), cudaMemcpyHostToDevice);
+    cudaMemcpy(c_d, c_h.data(), N * sizeof(double), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_d, d_h.data(), N * sizeof(double), cudaMemcpyHostToDevice);
 
-    // CPU reference
+    // =====[ CPU reference solve ]=====
     PaScaL_TDMA::PTDMAPlanMany px_many;
     px_many.create(nx_sub, ny*nz, MPI_COMM_WORLD, PaScaL_TDMA::TDMAType::Standard);
-    PaScaL_TDMA::PTDMASolverMany::solve(px_many, h_a, h_b, h_c, h_d);
+    PaScaL_TDMA::PTDMASolverMany::solve(px_many, a_h, b_h, c_h, d_h);
     px_many.destroy();
 
-    // GPU value
+    // =====[ GPU solve ]=====
     cuPaScaL_TDMA::cuPTDMAPlanMany px_cuMany;
     px_cuMany.create(nx_sub, ny, nz, MPI_COMM_WORLD, cuPaScaL_TDMA::TDMAType::Standard);
-    cuPaScaL_TDMA::cuPTDMASolverMany::cuSolve(px_cuMany, d_a, d_b, d_c, d_d);
+    cuPaScaL_TDMA::cuPTDMASolverMany::cuSolve(px_cuMany, a_d, b_d, c_d, d_d);
     px_cuMany.destroy();
 
-    std::vector<double> h_d_out(N);
-    cudaMemcpy(h_d_out.data(), d_d, N * sizeof(double), cudaMemcpyDeviceToHost);
+    std::vector<double> d_h_out(N);
+    cudaMemcpy(d_h_out.data(), d_d, N * sizeof(double), cudaMemcpyDeviceToHost);
 
+    // Compare results: accumulate total error
     double error = 0.0;
     for (int i = 0; i < N; i++) {
-        error += std::abs(h_d[i] - h_d_out[i]);
+        error += std::abs(d_h[i] - d_h_out[i]);
     }
 
     if(is_root) std::cout << "Total error: " << error << std::endl;
 
-    cudaFree(d_a); cudaFree(d_b); cudaFree(d_c); cudaFree(d_d);
+    cudaFree(a_d); cudaFree(b_d); cudaFree(c_d); cudaFree(d_d);
     
+    // Assert: Each value within tolerance
     for (int i = 0; i < N; i++) {
-        EXPECT_NEAR(h_d[i], h_d_out[i], tolerance) << 
+        EXPECT_NEAR(d_h[i], d_h_out[i], tolerance) << 
             "Mismatch at (i, j, k) = ( " << (int)(i/(ny*nz)) << ", " << (int)(i/nz)%ny << ", " << i%nz <<" )" << std::endl;
     }
 }
 
+// Global variables for GoogleTest argument passing
 int g_argc;
 char** g_argv;
 
+/**
+ * @brief Main entry point for MPI+GoogleTest runs.
+ *
+ * Initializes MPI, passes arguments to tests, runs all tests, and finalizes MPI.
+ */
 int main(int argc, char** argv) {
 
     MPI_Init(&argc, &argv);
