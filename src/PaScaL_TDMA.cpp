@@ -119,7 +119,8 @@ namespace PaScaL_TDMA {
         const int n_row = plan.n_row_;
         
         if (n_row <= 2) {
-            std::cerr << "Error: n_row must be > 2 in rank : " << plan.rank_ << std::endl;
+            std::cerr << "Error: n_row = " << n_row <<" must be > 2 in rank : " 
+                      << plan.rank_ << std::endl;
             MPI_Abort(MPI_COMM_WORLD, 1);
         }
 

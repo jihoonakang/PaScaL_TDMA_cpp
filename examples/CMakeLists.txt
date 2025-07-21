@@ -23,3 +23,8 @@ if(CUDA)
     add_cuda_example(cuMany     cuMany.cpp)
     add_cuda_example(cuManyRHS  cuManyRHS.cpp)
 endif()
+
+# Fortran examples
+if(FORTRAN)
+    add_subdirectory(fortran)
+endif()
