@@ -123,6 +123,7 @@ void cuTDMASolver::cuMany(const double* a_d, const double* b_d,
     // Kernel launch
     cuManyKernel<<<blocks, threads, shmem, stream>>>(
         a_d, b_d, c_d, d_d, nx, ny, nz );
+    cudaDeviceSynchronize();
 
 }
 
@@ -287,6 +288,7 @@ void cuTDMASolver::cuManyCyclic(const double* a_d, const double* b_d,
     // Kernel launch
     cuManyCyclicKernel<<<blocks, threads, shmem, stream>>>(
         a_d, b_d, c_d, d_d, e_d, nx, ny, nz);
+    cudaDeviceSynchronize();
 
     cudaFree(e_d);
 }
@@ -398,6 +400,7 @@ void cuTDMASolver::cuManyRHS(const double* a_d, const double* b_d,
     // Kernel launch
     cuManyRHSKernel<<<blocks, threads, shmem, stream>>>(
         a_d, b_d, c_d, d_d, nx, ny, nz);
+    cudaDeviceSynchronize();
 
 }
 
@@ -537,4 +540,6 @@ void cuTDMASolver::cuManyRHSCyclic(const double* a_d, const double* b_d, double*
     // Kernel launch
     cuManyRHSCyclicKernel<<<blocks, threads, shmem, stream>>>(
         a_d, b_d, c_d, d_d, nx, ny, nz);
+
+    cudaDeviceSynchronize();
 }
