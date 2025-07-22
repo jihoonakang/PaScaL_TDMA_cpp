@@ -2,11 +2,11 @@
 cmake_minimum_required(VERSION 3.19)
 
 # 1. Option definitions
-option(CUDA "Enable GPU (CUDA) support" OFF)
-option(CUDA_AWARE_MPI "Enable CUDA-Aware MPI support" OFF)
+option(CUDA "Enable GPU (CUDA) support" on)
+option(CUDA_AWARE_MPI "Enable CUDA-Aware MPI support" on)
 option(TESTING "Enable building and running tests" ON)
 option(PYTHON "Enable Python bindings using pybind11" on)
-option(FORTRAN "Enable Fortran interface" on)
+option(FORTRAN "Enable Fortran interface" off)
 
 # 2. Project declaration based on CUDA and FORTRAN support
 if(CUDA AND FORTRAN)

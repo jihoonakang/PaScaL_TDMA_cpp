@@ -596,7 +596,7 @@ namespace cuPaScaL_TDMA {
         cudaMalloc((void**)&c_rt_d_, sizeof(double) * n_row_rt_ * n_sys_rt_);
         cudaMalloc((void**)&d_rt_d_, sizeof(double) * n_row_rt_ * n_sys_rt_);
 
-        threads_         = dim3(THREAD_X, THREADS_Y, THREADS_Z);
+        threads_         = dim3(THREADS_X, THREADS_Y, THREADS_Z);
 
         int ny_block = ny_sys_ / threads_.x;
         if (ny_block == 0 || (ny_sys % threads_.x != 0)) {
@@ -758,7 +758,7 @@ namespace cuPaScaL_TDMA {
         cudaMalloc((void**)&c_rt_d_, sizeof(double) * n_row_rt_);
         cudaMalloc((void**)&d_rt_d_, sizeof(double) * n_row_rt_ * n_sys_rt_);
 
-        threads_         = dim3(THREAD_X, THREADS_Y, THREADS_Z);
+        threads_         = dim3(THREADS_X, THREADS_Y, THREADS_Z);
 
         int ny_block = ny_sys_ / threads_.x;
         if (ny_block == 0 || (ny_sys % threads_.x != 0)) {
