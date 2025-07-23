@@ -29,7 +29,7 @@ void pascal_tdma_plan_many_rhs_create(void** handle, int n_row, int n_sys,
                                     MPI_Fint mpi_comm, int tdma_type);
 
 void pascal_tdma_many_rhs_solve(void* handle,
-                              double* a, double* b, double* c, double* d);
+                                double* a, double* b, double* c, double* d);
 
 void pascal_tdma_plan_many_rhs_destroy(void* handle);
 

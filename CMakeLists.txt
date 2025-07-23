@@ -6,10 +6,11 @@ option(CUDA "Enable GPU (CUDA) support" on)
 option(CUDA_AWARE_MPI "Enable CUDA-Aware MPI support" on)
 option(TESTING "Enable building and running tests" ON)
 option(PYTHON "Enable Python bindings using pybind11" on)
-option(FORTRAN "Enable Fortran interface" off)
+option(FORTRAN "Enable Fortran interface" on)
 
 # 2. Project declaration based on CUDA and FORTRAN support
 if(CUDA AND FORTRAN)
+    set(CMAKE_Fortran_COMPILER nvfortran)
     project(PaScaL_TDMA LANGUAGES CXX CUDA Fortran)
 elseif(CUDA)
     project(PaScaL_TDMA LANGUAGES CXX CUDA)
