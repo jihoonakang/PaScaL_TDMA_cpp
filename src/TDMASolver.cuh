@@ -24,8 +24,7 @@ public:
         double*       d_d,    ///< RHS vectors (in/out)
         int           nx,     ///< rows per system
         int           ny,     ///< systems in Y-dimension
-        int           nz,     ///< systems in Z-dimension
-        cudaStream_t  stream = 0 ///< CUDA stream
+        int           nz      ///< systems in Z-dimension
     ) noexcept;
 
     /// Solve many cyclic tridiagonal systems on the GPU.
@@ -36,8 +35,7 @@ public:
         double*       d_d,    ///< RHS vectors (in/out)
         int           nx,     ///< rows per system
         int           ny,     ///< systems in Y-dimension
-        int           nz,     ///< systems in Z-dimension
-        cudaStream_t  stream = 0 ///< CUDA stream
+        int           nz      ///< systems in Z-dimension
     ) noexcept;
 
     /// Solve batched systems with shared diagonals (multiple RHS) on the GPU.
@@ -48,8 +46,7 @@ public:
         double*       d_d,    ///< RHS buffer (in/out)
         int           nx,     ///< rows per system
         int           ny,     ///< number of RHS per row
-        int           nz,     ///< systems in Z-dimension
-        cudaStream_t  stream = 0 ///< CUDA stream
+        int           nz      ///< systems in Z-dimension
     ) noexcept;
 
     /// Solve batched cyclic systems with shared diagonals on the GPU.
@@ -60,7 +57,6 @@ public:
         double*       d_d,    ///< RHS vectors (in/out)
         int           nx,     ///< rows per system
         int           ny,     ///< number of RHS per row
-        int           nz,     ///< systems in Z-dimension
-        cudaStream_t  stream = 0 ///< CUDA stream
+        int           nz      ///< systems in Z-dimension
     ) noexcept;
 };

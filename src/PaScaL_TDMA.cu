@@ -232,7 +232,6 @@ __global__ void cuReconstructMany(const double* a, const double* c, double* d,
     // Load reduced system solutions into shared memory
     ds[tid] = d_rd[gid];             // d_rd(:,:,1)
     de[tid] = d_rd[gid + stride];    // d_rd(:,:,2)
-    __syncthreads();
 
     // Update solution vector
     d[gid] = ds[tid];                // d(:,:,1)
@@ -423,7 +422,6 @@ __global__ void cuReconstructManyRHS(
     // Load reduced system solutions into shared memory
     ds[tid] = d_rd[gid];             // d_rd(:,:,1)
     de[tid] = d_rd[gid + stride];    // d_rd(:,:,2)
-    __syncthreads();
 
     // Update solution vector
     d[gid] = ds[tid];                // d(:,:,1)
@@ -497,15 +495,6 @@ __global__ void mem_detach_slab_yz(const double* __restrict__ slab_yz,
 namespace cuPaScaL_TDMA {
 
     /**
-    * @brief Base-level create: not supported.
-    * @throws std::runtime_error Always.
-    */
-    void cuPTDMAPlanBase::create(int n_row, int ny_sys, int nz_sys, 
-                                 MPI_Comm comm_ptdma, TDMAType type_) {
-        throw std::runtime_error("create(int, int, MPI_Comm, TDMAType) not implemented");
-    }
-
-    /**
     * @brief Exchange an XY‐slab and reassemble it into a YZ‐slab.
     *
     * Each rank sends its XY‐slab contiguous buffer to all others,
@@ -532,15 +521,62 @@ namespace cuPaScaL_TDMA {
         MPI_Alltoall(slab_xy, blockCount, MPI_DOUBLE,
                     buf_dev, blockCount, MPI_DOUBLE,
                     p.comm_ptdma_);
-        cudaDeviceSynchronize();
 
         // Unite 1D buffer into YZ slab
         mem_unite_slab_yz<<<p.blocks_alltoall_, p.threads_>>>(
             buf_dev, slab_yz,
             p.n_row_rd_, p.ny_sys_, p.nz_sys_, p.size_);
-        cudaDeviceSynchronize();
 
         cudaFree(buf_dev);
+    }
+
+    /**
+    * @brief Detach an YZ‐slab and reassemble it into a XY‐slab.
+    *
+    * After local detachment of the 2D YZ‐slab into a contiguous 1D array,
+    * each rank exchanges its boundary data with all others via MPI_Alltoall,
+    * and the received buffer is directly laid out as an XY‐slab.
+    *
+    * @tparam PlanType     Type of the TDMA plan 
+    * @param[in]  p        Plan carrying dimensions and block/grid config
+    * @param[in]  slab_yz  Input slab in Y–Z ordering (device pointer).
+    * @param[out] slab_xy  Output slab in X–Y ordering (device pointer).
+    */
+    template<typename PlanType>
+    void transposeSlabYZtoXY(const PlanType& p,
+                            const double* slab_yz,
+                            double* slab_xy) {
+        int blockCount = p.n_row_rd_ * p.n_sys_ / p.size_;
+        size_t buf_bytes = sizeof(double) * p.n_row_rd_ * p.n_sys_;
+
+        // Allocate device buffer
+        double* buf_dev;
+        cudaMalloc(&buf_dev, buf_bytes);
+
+        cudaStream_t stream;
+        cudaStreamCreate(&stream);
+        // Detach YZ slab into 1D buffer
+        mem_detach_slab_yz<<<p.blocks_alltoall_, p.threads_, 0, stream>>>(
+            slab_yz, buf_dev,
+            p.n_row_rd_, p.ny_sys_, p.nz_sys_, p.size_);
+        cudaStreamSynchronize(stream);
+
+        // Exchange boundaries
+        MPI_Alltoall(buf_dev, blockCount, MPI_DOUBLE,
+                    slab_xy, blockCount, MPI_DOUBLE,
+                    p.comm_ptdma_);
+
+        cudaStreamDestroy(stream);
+        cudaFree(buf_dev);
+    }
+
+    /**
+    * @brief Base-level create: not supported.
+    * @throws std::runtime_error Always.
+    */
+    void cuPTDMAPlanBase::create(int n_row, int ny_sys, int nz_sys, 
+                                 MPI_Comm comm_ptdma, TDMAType type_) {
+        throw std::runtime_error("create(int, int, MPI_Comm, TDMAType) not implemented");
     }
 
     //-------------------------------------------------------------------------------
@@ -881,43 +917,6 @@ namespace cuPaScaL_TDMA {
             (a, c, d, plan.d_rd_d_, n_row, ny_sys, nz_sys);
 
         cudaDeviceSynchronize();
-    }
-
-    /**
-    * @brief Detach an YZ‐slab and reassemble it into a XY‐slab.
-    *
-    * After local detachment of the 2D YZ‐slab into a contiguous 1D array,
-    * each rank exchanges its boundary data with all others via MPI_Alltoall,
-    * and the received buffer is directly laid out as an XY‐slab.
-    *
-    * @tparam PlanType     Type of the TDMA plan 
-    * @param[in]  p        Plan carrying dimensions and block/grid config
-    * @param[in]  slab_yz  Input slab in Y–Z ordering (device pointer).
-    * @param[out] slab_xy  Output slab in X–Y ordering (device pointer).
-    */
-    template<typename PlanType>
-    void transposeSlabYZtoXY(const PlanType& p,
-                            const double* slab_yz,
-                            double* slab_xy) {
-        int blockCount = p.n_row_rd_ * p.n_sys_ / p.size_;
-        size_t buf_bytes = sizeof(double) * p.n_row_rd_ * p.n_sys_;
-
-        // Allocate device buffer
-        double* buf_dev;
-        cudaMalloc(&buf_dev, buf_bytes);
-
-        // Detach YZ slab into 1D buffer
-        mem_detach_slab_yz<<<p.blocks_alltoall_, p.threads_>>>(
-            slab_yz, buf_dev,
-            p.n_row_rd_, p.ny_sys_, p.nz_sys_, p.size_);
-        cudaDeviceSynchronize();
-
-        // Exchange boundaries
-        MPI_Alltoall(buf_dev, blockCount, MPI_DOUBLE,
-                    slab_xy, blockCount, MPI_DOUBLE,
-                    p.comm_ptdma_);
-
-        cudaFree(buf_dev);
     }
 
     //================================

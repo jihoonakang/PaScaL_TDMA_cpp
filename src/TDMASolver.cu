@@ -107,8 +107,7 @@ __global__ static void cuManyKernel(const double* __restrict__ a,
  */
 void cuTDMASolver::cuMany(const double* a_d, const double* b_d, 
                           double* c_d, double* d_d,
-                          int nx, int ny, int nz, 
-                          cudaStream_t stream) noexcept {
+                          int nx, int ny, int nz) noexcept {
 
     assert(nz > 1 && ny > 0 && nx > 0);
 
@@ -120,11 +119,15 @@ void cuTDMASolver::cuMany(const double* a_d, const double* b_d,
     int sys_size = (threads.x + 1)* threads.y; // +1 padding for bank conflict
     size_t shmem = 6 * sys_size * sizeof(double); 
 
+    cudaStream_t stream;
+    cudaStreamCreate(&stream);
+
     // Kernel launch
     cuManyKernel<<<blocks, threads, shmem, stream>>>(
         a_d, b_d, c_d, d_d, nx, ny, nz );
-    cudaDeviceSynchronize();
 
+    cudaStreamSynchronize(stream);
+    cudaStreamDestroy(stream);
 }
 
 /**
@@ -270,8 +273,7 @@ __global__ static void cuManyCyclicKernel(const double* __restrict__ a,
  */
 void cuTDMASolver::cuManyCyclic(const double* a_d, const double* b_d, 
                                 double* c_d, double* d_d,
-                                int nx, int ny, int nz, 
-                                cudaStream_t stream) noexcept {
+                                int nx, int ny, int nz) noexcept {
 
     assert(nz > 1 && ny > 0 && nx > 0);
     double *e_d;
@@ -285,12 +287,16 @@ void cuTDMASolver::cuManyCyclic(const double* a_d, const double* b_d,
     int sys_size = (threads.x + 1)* threads.y; // +1 padding for bank conflict
     size_t shmem = 8 * sys_size * sizeof(double); 
 
+    cudaStream_t stream;
+    cudaStreamCreate(&stream);
+
     // Kernel launch
     cuManyCyclicKernel<<<blocks, threads, shmem, stream>>>(
         a_d, b_d, c_d, d_d, e_d, nx, ny, nz);
-    cudaDeviceSynchronize();
+    cudaStreamSynchronize(stream);
 
     cudaFree(e_d);
+    cudaStreamDestroy(stream);
 }
 
 /**
@@ -384,8 +390,7 @@ __global__ static void cuManyRHSKernel(const double* __restrict__ a,
  */
 void cuTDMASolver::cuManyRHS(const double* a_d, const double* b_d,
                              double* c_d, double* d_d,
-                             int nx, int ny, int nz,
-                             cudaStream_t stream) noexcept {
+                             int nx, int ny, int nz) noexcept {
 
     assert(nx > 1 && ny > 0 && nz > 0);
 
@@ -397,11 +402,15 @@ void cuTDMASolver::cuManyRHS(const double* a_d, const double* b_d,
     int sys_size = (threads.x + 1) * threads.y;  // +1 padding for bank conflict
     size_t shmem = 2 * sys_size * sizeof(double);
 
+    cudaStream_t stream;
+    cudaStreamCreate(&stream);
+    
     // Kernel launch
     cuManyRHSKernel<<<blocks, threads, shmem, stream>>>(
         a_d, b_d, c_d, d_d, nx, ny, nz);
-    cudaDeviceSynchronize();
 
+    cudaStreamSynchronize(stream);
+    cudaStreamDestroy(stream);
 }
 
 /**
@@ -525,8 +534,7 @@ __global__ static void cuManyRHSCyclicKernel(const double* __restrict__ a,
  * Configures thread blocks, shared memory size, and synchronizes.
  */
 void cuTDMASolver::cuManyRHSCyclic(const double* a_d, const double* b_d, double* c_d,
-                                   double* d_d, int nx, int ny, int nz,
-                                   cudaStream_t stream) noexcept {
+                                   double* d_d, int nx, int ny, int nz) noexcept {
     assert(nx > 2 && ny > 0 && nz > 0);
 
     // Launch configuration
@@ -537,9 +545,13 @@ void cuTDMASolver::cuManyRHSCyclic(const double* a_d, const double* b_d, double*
     int sys_size = (threads.x + 1) * threads.y; // +1 padding for bank conflict
     size_t shmem = 2 * sys_size * sizeof(double);  // d0, d1
 
+    cudaStream_t stream;
+    cudaStreamCreate(&stream);
+
     // Kernel launch
     cuManyRHSCyclicKernel<<<blocks, threads, shmem, stream>>>(
         a_d, b_d, c_d, d_d, nx, ny, nz);
 
-    cudaDeviceSynchronize();
+    cudaStreamSynchronize(stream);
+    cudaStreamDestroy(stream);
 }
