@@ -48,7 +48,8 @@ add_fortran_example(single_fortran SOURCES single.f90)
 add_fortran_example(many_fortran SOURCES mpi_topology_2D.f90 many.f90)
 add_fortran_example(many_rhs_fortran SOURCES mpi_topology_2D.f90 many_rhs_3D.f90)
 
-
 # GPU example
-add_cufortran_example(cu_many_fortran SOURCES cuMany.f90)
-add_cufortran_example(cu_many_rhs_fortran SOURCES cuManyRHS.f90)
+if(CUDA)
+    add_cufortran_example(cu_many_fortran SOURCES cuMany.f90)
+    add_cufortran_example(cu_many_rhs_fortran SOURCES cuManyRHS.f90)
+endif()
