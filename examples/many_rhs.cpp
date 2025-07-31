@@ -15,13 +15,13 @@ constexpr double a_lower = -1.0;
 
 using namespace PaScaL_TDMA;
 
-void generateRHS(dimArray<double>& D, dimArray<double>& X, 
+void generateRHS(DimArray<double>& D, DimArray<double>& X, 
                  int Nx, int Ny, int Nz);
 
-void distributeRHS(dimArray<double>& d_sub, const dimArray<double>& d,
+void distributeRHS(DimArray<double>& d_sub, const DimArray<double>& d,
                    const DomainLayout3D& dom, const CommLayout2D& topo);
 
-void collectSolution(dimArray<double>& d, const dimArray<double>& d_sub,
+void collectSolution(DimArray<double>& d, const DimArray<double>& d_sub,
                      const DomainLayout3D& dom, const CommLayout2D& topo);
 
 int main(int argc, char** argv) {
@@ -62,14 +62,14 @@ int main(int argc, char** argv) {
 
     topo.buildCommBufferInfo(nx_sub, ny_sub, nz);
 
-    dimArray<double> d, x;
+    DimArray<double> d, x;
     if (is_root) {
         d.resize(nx, ny, nz);
         x.resize(nx, ny, nz);
         generateRHS(d, x, nx, ny, nz);
     }
 
-    dimArray<double> d_sub(nx_sub, ny_sub, nz);
+    DimArray<double> d_sub(nx_sub, ny_sub, nz);
     distributeRHS(d_sub, d, dom, topo);
 
 // Solve in x-direction
@@ -88,7 +88,7 @@ int main(int argc, char** argv) {
     std::vector by(ny_sub, a_diag);
     std::vector cy(ny_sub, a_upper);
 
-    dimArray<double> d_sub_tr(ny_sub, nx_sub, nz);
+    DimArray<double> d_sub_tr(ny_sub, nx_sub, nz);
 
     for (int i = 0; i < nx_sub; i++)
         for (int j = 0; j < ny_sub; j++)
@@ -140,7 +140,7 @@ int main(int argc, char** argv) {
 
 }
 
-void generateRHS(dimArray<double>& D, dimArray<double>& X, 
+void generateRHS(DimArray<double>& D, DimArray<double>& X, 
                  int Nx, int Ny, int Nz) {
 
     const std::vector<double> ax(Nx, a_lower);
@@ -155,8 +155,8 @@ void generateRHS(dimArray<double>& D, dimArray<double>& X,
     const std::vector<double> bz(Nz, a_diag);
     const std::vector<double> cz(Nz, a_upper);
 
-    dimArray<double> y(Nx, Ny, Nz);
-    dimArray<double> z(Nx, Ny, Nz);
+    DimArray<double> y(Nx, Ny, Nz);
+    DimArray<double> z(Nx, Ny, Nz);
 
     std::random_device rd;
     std::mt19937 gen(rd());
@@ -223,7 +223,7 @@ void generateRHS(dimArray<double>& D, dimArray<double>& X,
                             + cx[Nx - 1] * z(0, j, k);
 }
 
-void distributeRHS(dimArray<double>& d_sub, const dimArray<double>& d,
+void distributeRHS(DimArray<double>& d_sub, const DimArray<double>& d,
                     const DomainLayout3D& dom, const CommLayout2D& topo) {
 
     std::vector<double> d_blk;
@@ -270,7 +270,7 @@ void distributeRHS(dimArray<double>& d_sub, const dimArray<double>& d,
                 d_sub(i, j, k) = recv_blk[i * ny_sub * nz_sub + j * nz_sub + k];
 }
 
-void collectSolution(dimArray<double>& d, const dimArray<double>& d_sub,
+void collectSolution(DimArray<double>& d, const DimArray<double>& d_sub,
                      const DomainLayout3D& dom, const CommLayout2D& topo) {
 
     std::vector<double> d_blk;

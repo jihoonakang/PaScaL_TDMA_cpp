@@ -37,7 +37,7 @@ using namespace PaScaL_TDMA;
  * @param Ny      Number of grid points in y direction
  * @param Nz      Number of grid points in z direction
  */
-void generateRHS(dimArray<double>& D, dimArray<double>& X, 
+void generateRHS(DimArray<double>& D, DimArray<double>& X, 
                  int Nx, int Ny, int Nz) {
 
     const std::vector<double> ax(Nx, a_lower);
@@ -52,8 +52,8 @@ void generateRHS(dimArray<double>& D, dimArray<double>& X,
     const std::vector<double> bz(Nz, a_diag);
     const std::vector<double> cz(Nz, a_upper);
 
-    dimArray<double> y(Nx, Ny, Nz);
-    dimArray<double> z(Nx, Ny, Nz);
+    DimArray<double> y(Nx, Ny, Nz);
+    DimArray<double> z(Nx, Ny, Nz);
 
     std::random_device rd;
     std::mt19937 gen(0); // fixed seed for reproducibility
@@ -128,7 +128,7 @@ void generateRHS(dimArray<double>& D, dimArray<double>& X,
  * @param[in]  dom   3D domain decomposition information
  * @param[in]  topo  2D communication topology (process grid)
  */
-void distributeRHS(dimArray<double>& d_sub, const dimArray<double>& d,
+void distributeRHS(DimArray<double>& d_sub, const DimArray<double>& d,
                     const DomainLayout3D& dom, const CommLayout2D& topo) {
 
     std::vector<double> d_blk;
@@ -233,14 +233,14 @@ TEST(PaScaL_TDMA_many, Solve) {
 
     topo.buildCommBufferInfo(nx_sub, ny_sub, nz);
 
-    dimArray<double> D, X;
+    DimArray<double> D, X;
     if (is_root) {
         D.resize(nx, ny, nz);
         X.resize(nx, ny, nz);
         generateRHS(D, X, nx, ny, nz);
     }
 
-    dimArray<double> d_sub(nx_sub, ny_sub, nz), x_sub(nx_sub, ny_sub, nz);
+    DimArray<double> d_sub(nx_sub, ny_sub, nz), x_sub(nx_sub, ny_sub, nz);
     distributeRHS(d_sub, D, dom, topo);
     distributeRHS(x_sub, X, dom, topo);
 
@@ -260,7 +260,7 @@ TEST(PaScaL_TDMA_many, Solve) {
     std::vector by(ny_sub, a_diag);
     std::vector cy(ny_sub, a_upper);
 
-    dimArray<double> d_sub_tr(ny_sub, nx_sub, nz);
+    DimArray<double> d_sub_tr(ny_sub, nx_sub, nz);
 
     for (int i = 0; i < nx_sub; i++)
         for (int j = 0; j < ny_sub; j++)

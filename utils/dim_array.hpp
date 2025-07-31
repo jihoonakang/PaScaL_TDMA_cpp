@@ -2,7 +2,7 @@
  * @file dim_array.hpp
  * @brief Provides a 2D/3D array interface on top of std::vector.
  *
- * The dimArray class template allows resizing, indexing, conversion and
+ * The DimArray class template allows resizing, indexing, conversion and
  * bounds checking among 1D, 2D, and 3D views of a contiguous data buffer.
  */
 #pragma once
@@ -14,7 +14,7 @@
 enum class ShapeType { None, Dim2D, Dim3D };    ///< Dimensionality of the array
 
 /**
- * @class dimArray
+ * @class DimArray
  * @brief Multi-dimensional array wrapper around std::vector.
  *
  * @tparam T Element type stored in the array.
@@ -23,7 +23,7 @@ enum class ShapeType { None, Dim2D, Dim3D };    ///< Dimensionality of the array
  *       with operator() overloads.
  */
 template <class T>
-class dimArray {
+class DimArray {
 
 private:
     std::vector<T> data_;                           /**< Contiguous data buf */
@@ -33,25 +33,25 @@ private:
 
 public:
     /// Default constructor initializes an empty array.
-    dimArray() noexcept = default;
+    DimArray() noexcept = default;
 
     /// Constructs a 1D array of length x.
-    explicit dimArray(int x) noexcept { resize(x); }
+    explicit DimArray(int x) noexcept { resize(x); }
 
     /// Constructs a 2D array of size x by y.
-    dimArray(int x, int y) noexcept { resize(x, y); }
+    DimArray(int x, int y) noexcept { resize(x, y); }
 
     /// Constructs a 3D array of size x by y by z.
-    dimArray(int x, int y, int z) noexcept { resize(x, y, z); }
+    DimArray(int x, int y, int z) noexcept { resize(x, y, z); }
 
     /// Constructs a 2D array from an existing vector - vec.
-    dimArray(const std::vector<T>& vec, int x, int y)
+    DimArray(const std::vector<T>& vec, int x, int y)
         : data_(vec), dim2d_x_(x), dim2d_y_(y), shape_type_(ShapeType::Dim2D) {
         assert(static_cast<int>(data_.size()) == x * y);
     }
 
     /// Constructs a 3D array from an existing vector - vec.
-    dimArray(const std::vector<T>& vec, int x, int y, int z)
+    DimArray(const std::vector<T>& vec, int x, int y, int z)
         : data_(vec), dim3d_x_(x), dim3d_y_(y), dim3d_z_(z), 
           shape_type_(ShapeType::Dim3D) {
         assert(static_cast<int>(data_.size()) == x * y * z);
@@ -59,14 +59,14 @@ public:
 
     /// Constructs a 2D array from an iterator range, first to last.
     template <typename InputIt>
-    dimArray(InputIt first, InputIt last, int x, int y)
+    DimArray(InputIt first, InputIt last, int x, int y)
         : data_(first, last), dim2d_x_(x), dim2d_y_(y), shape_type_(ShapeType::Dim2D) {
         assert(std::distance(first, last) == x * y);
     }
 
     /// Constructs a 3D array from an iterator range, first to last.
     template <typename InputIt>
-    dimArray(InputIt first, InputIt last, int x, int y, int z)
+    DimArray(InputIt first, InputIt last, int x, int y, int z)
         : data_(first, last), dim3d_x_(x), dim3d_y_(y), dim3d_z_(z),
           shape_type_(ShapeType::Dim3D) {
         assert(std::distance(first, last) == x * y * z);

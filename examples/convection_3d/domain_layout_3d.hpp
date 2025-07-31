@@ -26,7 +26,7 @@ class DomainLayout3D {
     std::vector<double> dmx_sub, dmy_sub, dmz_sub;
 
     // Boundary condition fields
-    dimArray<double> thetaBC3_sub, thetaBC4_sub;
+    DimArray<double> thetaBC3_sub, thetaBC4_sub;
 
     // Flags
     std::vector<int> jmbc_index, jpbc_index;
@@ -47,15 +47,15 @@ public:
     void cleanupDomain();
 
     // Ghost update
-    void updateGhostCells(dimArray<double>& theta_sub, const CommLayout3D& comm) const;
+    void updateGhostCells(DimArray<double>& theta_sub, const CommLayout3D& comm) const;
     void assignMesh(const CommLayout3D& comm, const GlobalParams& params);
 
     // Initialization of theta_sub
-    void initializeField(dimArray<double>& theta_sub,
+    void initializeField(DimArray<double>& theta_sub,
                          const CommLayout3D& topo,
                          const GlobalParams& params);
 
-    void assignBoundaries(const dimArray<double>& theta_sub, 
+    void assignBoundaries(const DimArray<double>& theta_sub, 
                           const CommLayout3D& topo,
                           const GlobalParams& params);
 
@@ -72,8 +72,8 @@ public:
     const std::vector<int> getLowerBoundaryFlags() const { return jmbc_index; }
     const std::vector<int> getUpperBoundaryFlags() const { return jpbc_index; }
 
-    const dimArray<double> getLowerBoundaryValues() const { return thetaBC3_sub; }
-    const dimArray<double> getUpperBoundaryValues() const { return thetaBC4_sub; }
+    const DimArray<double> getLowerBoundaryValues() const { return thetaBC3_sub; }
+    const DimArray<double> getUpperBoundaryValues() const { return thetaBC4_sub; }
 
     const std::vector<double> getDMX() const { return dmx_sub; }
     const std::vector<double> getDMY() const { return dmy_sub; }

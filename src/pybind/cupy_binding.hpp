@@ -12,7 +12,7 @@
 #include "../pascal_tdma.cuh"
 
 namespace py = pybind11;
-namespace cuTDMA = cuPaScaL_TDMA;
+namespace cuTDMA = CuPaScaL_TDMA;
 
 /**
  * @brief Extract raw device pointer from a CuPy array.
@@ -38,20 +38,20 @@ PYBIND11_MODULE(PaScaL_TDMA_cuda_pybind, m) {
     m.doc() = R"doc(
         CUDA-based PaScaL_TDMA tridiagonal solver bindings.
 
-        Plan classes (cuPTDMAPlanMany, cuPTDMAPlanManyRHS) manage GPU buffers;
+        Plan classes (CuPTDMAPlanMany, CuPTDMAPlanManyRHS) manage GPU buffers;
         solve functions operate in-place on CuPy arrays.
     )doc";
 
     // ----------------------------------------------------------------
-    // cuPTDMAPlanMany: plan for many systems on GPU
+    // CuPTDMAPlanMany: plan for many systems on GPU
     // ----------------------------------------------------------------
     /**
-     * @class cuPTDMAPlanMany
+     * @class CuPTDMAPlanMany
      * @brief GPU plan for solving multiple tridiagonal systems in YZ slabs.
      */
-    py::class_<cuTDMA::cuPTDMAPlanMany>(m, "cuPTDMAPlanMany")
+    py::class_<cuTDMA::CuPTDMAPlanMany>(m, "CuPTDMAPlanMany")
         .def(py::init<>())
-        .def("create", []   (cuTDMA::cuPTDMAPlanMany& plan, 
+        .def("create", []   (cuTDMA::CuPTDMAPlanMany& plan, 
                             int n_row, int ny_sys, int nz_sys, 
                             int comm, bool cyclic){
 
@@ -66,18 +66,18 @@ PYBIND11_MODULE(PaScaL_TDMA_cuda_pybind, m) {
         py::arg("communicator"),
         py::arg("cyclic") = false,
             "Initialize GPU plan for many tridiagonal systems.")
-        .def("destroy", &cuTDMA::cuPTDMAPlanMany::destroy);
+        .def("destroy", &cuTDMA::CuPTDMAPlanMany::destroy);
 
     // ----------------------------------------------------------------
-    // cuPTDMAPlanManyRHS: plan for many RHS vectors on GPU
+    // CuPTDMAPlanManyRHS: plan for many RHS vectors on GPU
     // ----------------------------------------------------------------
     /**
-     * @class cuPTDMAPlanManyRHS
+     * @class CuPTDMAPlanManyRHS
      * @brief GPU plan for solving many RHS vectors with shared diagonals.
      */
-    py::class_<cuTDMA::cuPTDMAPlanManyRHS>(m, "cuPTDMAPlanManyRHS")
+    py::class_<cuTDMA::CuPTDMAPlanManyRHS>(m, "CuPTDMAPlanManyRHS")
         .def(py::init<>())
-        .def("create", []   (cuTDMA::cuPTDMAPlanManyRHS& plan, 
+        .def("create", []   (cuTDMA::CuPTDMAPlanManyRHS& plan, 
                             int n_row, int ny_sys, int nz_sys, 
                             int comm, bool cyclic){
 
@@ -92,7 +92,7 @@ PYBIND11_MODULE(PaScaL_TDMA_cuda_pybind, m) {
         py::arg("communicator"),
         py::arg("cyclic") = false,
             "Initialize GPU plan for many-RHS tridiagonal solve.")
-        .def("destroy", &cuTDMA::cuPTDMAPlanManyRHS::destroy);
+        .def("destroy", &cuTDMA::CuPTDMAPlanManyRHS::destroy);
 
     // ----------------------------------------------------------------
     // cuSolveMany: solver for GPU many systems
@@ -106,11 +106,11 @@ PYBIND11_MODULE(PaScaL_TDMA_cuda_pybind, m) {
      * @param C    CuPy array of super-diagonal coefficients.
      * @param D    CuPy array of RHS values, overwritten with solutions.
      */
-    m.def("cuSolveMany", [](cuTDMA::cuPTDMAPlanMany& plan, 
+    m.def("cuSolveMany", [](cuTDMA::CuPTDMAPlanMany& plan, 
                             py::object A, py::object B, 
                             py::object C, py::object D) {
 
-        cuTDMA::cuPTDMASolverMany::cuSolve(plan,
+        cuTDMA::CuPTDMASolverMany::cuSolve(plan,
             get_cupy_ptr(A),
             get_cupy_ptr(B),
             get_cupy_ptr(C),
@@ -135,11 +135,11 @@ PYBIND11_MODULE(PaScaL_TDMA_cuda_pybind, m) {
      * @param C    CuPy array of super-diagonal coefficients.
      * @param D    CuPy array of RHS values, overwritten with solutions.
      */
-    m.def("cuSolveManyRHS", [] (cuTDMA::cuPTDMAPlanManyRHS& plan, 
+    m.def("cuSolveManyRHS", [] (cuTDMA::CuPTDMAPlanManyRHS& plan, 
                                 py::object A, py::object B,
                                 py::object C, py::object D) {
                                     
-        cuTDMA::cuPTDMASolverManyRHS::cuSolve(plan,
+        cuTDMA::CuPTDMASolverManyRHS::cuSolve(plan,
             get_cupy_ptr(A),
             get_cupy_ptr(B),
             get_cupy_ptr(C),

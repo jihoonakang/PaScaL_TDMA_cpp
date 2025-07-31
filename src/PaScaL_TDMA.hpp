@@ -111,8 +111,8 @@ private:
     std::vector<MPI_Datatype> ddtype_rd_;   ///< MPI types for reduced system
     std::vector<MPI_Datatype> ddtype_rt_;   ///< MPI types for transposed system
 
-    dimArray<double> a_rd_, b_rd_, c_rd_, d_rd_;    ///< For reduces system
-    dimArray<double> a_rt_, b_rt_, c_rt_, d_rt_;    ///< For transposed system
+    DimArray<double> a_rd_, b_rd_, c_rd_, d_rd_;    ///< For reduces system
+    DimArray<double> a_rt_, b_rt_, c_rt_, d_rt_;    ///< For transposed system
 
 public:
     using PTDMAPlanBase::create;
@@ -142,10 +142,10 @@ private:
     std::vector<MPI_Datatype> ddtype_rt_;   ///< MPI types for transposed system
 
     std::vector<double> a_rd_, b_rd_, c_rd_;   ///< For reduces system
-    dimArray<double> d_rd_;                  ///< For reduces system, RHS
+    DimArray<double> d_rd_;                  ///< For reduces system, RHS
 
     std::vector<double> a_rt_, b_rt_, c_rt_;   ///< For transposed system
-    dimArray<double> d_rt_;                  ///< For transposed system, RHS
+    DimArray<double> d_rt_;                  ///< For transposed system, RHS
 
 public:
     using PTDMAPlanBase::create;
@@ -187,8 +187,8 @@ public:
 
     // Inline wrapper
     static inline void solve(PTDMAPlanMany& plan, 
-                             dimArray<double>& a, dimArray<double>& b, 
-                             dimArray<double>& c, dimArray<double>& d)
+                             DimArray<double>& a, DimArray<double>& b, 
+                             DimArray<double>& c, DimArray<double>& d)
     { solve(plan, a.getData(), b.getData(), c.getData(), d.getData()); }
 
     static inline void solve(PTDMAPlanMany& plan, 
@@ -209,7 +209,7 @@ public:
     // Inline wrapper
     static inline void solve(PTDMAPlanManyRHS& plan, 
                              std::vector<double>& a, std::vector<double>& b, 
-                             std::vector<double>& c, dimArray<double>& d)
+                             std::vector<double>& c, DimArray<double>& d)
     { solve(plan, a.data(), b.data(), c.data(), d.getData()); }
 
     static inline void solve(PTDMAPlanManyRHS& plan, 

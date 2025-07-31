@@ -34,10 +34,10 @@ using namespace PaScaL_TDMA;
  * @param Nx     Number of grid points in x direction
  * @param Ny     Number of grid points in y direction
  */
-void generateRHS(dimArray<double>& D, dimArray<double>& X, int Nx, int Ny) {
+void generateRHS(DimArray<double>& D, DimArray<double>& X, int Nx, int Ny) {
 
-    dimArray<double> A, B, C;
-    dimArray<double> Y(Nx, Ny);
+    DimArray<double> A, B, C;
+    DimArray<double> Y(Nx, Ny);
 
     A.assign(Nx, Ny, a_lower);
     B.assign(Nx, Ny, a_diag);
@@ -90,7 +90,7 @@ void generateRHS(dimArray<double>& D, dimArray<double>& X, int Nx, int Ny) {
  * @param[in]  dom   Domain decomposition information
  * @param[in]  topo  2D communication topology
  */
-void distributeRHS(dimArray<double>& d_sub, const dimArray<double>& d,
+void distributeRHS(DimArray<double>& d_sub, const DimArray<double>& d,
                     const DomainLayout2D& dom, const CommLayout2D& topo) {
 
     std::vector<double> d_blk;
@@ -188,16 +188,16 @@ TEST(PaScaL_TDMA_many, Solve) {
     topo.buildCommBufferInfo(nx_sub, ny_sub);
 
     // Prepare and distribute RHS and exact solution
-    dimArray<double> D, X;
+    DimArray<double> D, X;
     if (is_root)
         generateRHS(D, X, nx, ny);
 
-    dimArray<double> d_sub(nx_sub, ny_sub), x_sub(nx_sub, ny_sub);
+    DimArray<double> d_sub(nx_sub, ny_sub), x_sub(nx_sub, ny_sub);
     distributeRHS(d_sub, D, dom, topo);
     distributeRHS(x_sub, X, dom, topo);
 
     // =====[ Solve in x-direction ]=====
-    dimArray<double> a_sub, b_sub, c_sub;
+    DimArray<double> a_sub, b_sub, c_sub;
     a_sub.assign(nx_sub, ny_sub, a_lower);
     b_sub.assign(nx_sub, ny_sub, a_diag);
     c_sub.assign(nx_sub, ny_sub, a_upper);
@@ -208,7 +208,7 @@ TEST(PaScaL_TDMA_many, Solve) {
     px_many.destroy();
 
     // =====[ Solve in y-direction ]=====
-    dimArray<double> d_sub_tr(ny_sub, nx_sub);
+    DimArray<double> d_sub_tr(ny_sub, nx_sub);
 
      // Transpose for y-direction sweep (required by solver interface)
     for (int i = 0; i < nx_sub; i++)

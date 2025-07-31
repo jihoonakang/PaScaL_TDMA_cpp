@@ -7,9 +7,9 @@ DomainLayout3D::DomainLayout3D( const int nx_, const int ny_, const int nz_,
 
     n_all = nx * ny * nz;
 
-    nx_sub = Util::para_range(nx - 1, topo.getSizeX(), topo.getRankX(), ista, iend) + 1;
-    ny_sub = Util::para_range(ny - 1, topo.getSizeY(), topo.getRankY(), jsta, jend) + 1;
-    nz_sub = Util::para_range(nz - 1, topo.getSizeZ(), topo.getRankZ(), ksta, kend) + 1;
+    nx_sub = Util::paraRange(nx - 1, topo.getSizeX(), topo.getRankX(), ista, iend) + 1;
+    ny_sub = Util::paraRange(ny - 1, topo.getSizeY(), topo.getRankY(), jsta, jend) + 1;
+    nz_sub = Util::paraRange(nz - 1, topo.getSizeZ(), topo.getRankZ(), ksta, kend) + 1;
 
     n_sub = nx_sub * ny_sub * nz_sub;
 
@@ -143,7 +143,7 @@ void DomainLayout3D::createGhostCellMPITypes() {
 }
 
 // Ghost update
-void DomainLayout3D::updateGhostCells(dimArray<double>& theta_sub, 
+void DomainLayout3D::updateGhostCells(DimArray<double>& theta_sub, 
                                       const CommLayout3D& comm) const {
 
     MPI_Request requests[12];
@@ -205,7 +205,7 @@ void DomainLayout3D::assignMesh(const CommLayout3D& comm,
 }
 
 // Initialization of theta_sub
-void DomainLayout3D::initializeField(dimArray<double>& theta_sub,
+void DomainLayout3D::initializeField(DimArray<double>& theta_sub,
                                      const CommLayout3D& topo,
                                      const GlobalParams& params) {
 
@@ -235,7 +235,7 @@ void DomainLayout3D::initializeField(dimArray<double>& theta_sub,
 }
 
 // Boundary condition assignment
-void DomainLayout3D::assignBoundaries(const dimArray<double>& theta_sub,
+void DomainLayout3D::assignBoundaries(const DimArray<double>& theta_sub,
                                       const CommLayout3D& topo,
                                       const GlobalParams& params) {
 

@@ -62,7 +62,7 @@ def main(nx, ny, nz, type_str):
     plan.destroy()
 
 
-    plan = cuTdma.cuPTDMAPlanManyRHS()
+    plan = cuTdma.CuPTDMAPlanManyRHS()
     plan.create(nx, ny, nz, comm.py2f(), cyclic=is_cyclic)
     cuTdma.cuSolveManyRHS(plan, a_gpu, b_gpu, c_gpu, D_gpu)
     plan.destroy()

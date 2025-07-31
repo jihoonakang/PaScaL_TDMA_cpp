@@ -3,7 +3,7 @@
  * @brief Solver routines for tridiagonal and cyclic tridiagonal systems.
  *
  * Implements the Thomas algorithm and its variants for single,
- * cyclic, and batched systems using std::vector and dimArray.
+ * cyclic, and batched systems using std::vector and DimArray.
  */
 #pragma once
 
@@ -15,7 +15,7 @@
  * @class TDMASolver
  * @brief Static methods to solve tridiagonal linear systems.
  *
- * All methods perform in-place modifications on C and D arrays (or dimArray).
+ * All methods perform in-place modifications on C and D arrays (or DimArray).
  */
 class TDMASolver {
 public:
@@ -63,10 +63,10 @@ public:
      * @param n_row Number of rows per system.
      * @param n_sys Number of independent systems.
      */
-    static void many(const dimArray<double>& a,
-                     const dimArray<double>& b,
-                     dimArray<double>& c,
-                     dimArray<double>& d,
+    static void many(const DimArray<double>& a,
+                     const DimArray<double>& b,
+                     DimArray<double>& c,
+                     DimArray<double>& d,
                      const int n_row, 
                      const int n_sys) {
 
@@ -82,10 +82,10 @@ public:
      * @param n_row Rows per system.
      * @param n_sys Number of systems.
      */
-    static void manyCyclic(dimArray<double>& a,
-                           dimArray<double>& b,
-                           dimArray<double>& c,
-                           dimArray<double>& d,
+    static void manyCyclic(DimArray<double>& a,
+                           DimArray<double>& b,
+                           DimArray<double>& c,
+                           DimArray<double>& d,
                            const int n_row, const 
                            int n_sys) {
     
@@ -98,14 +98,14 @@ public:
      * @param a Lower-diagonal (size n).
      * @param b Diagonal (size n).
      * @param c Upper-diagonal (size n), overwritten.
-     * @param d RHS stored in dimArray (n_row × n_sys), overwritten.
+     * @param d RHS stored in DimArray (n_row × n_sys), overwritten.
      * @param n_row Number of rows.
      * @param n_sys Number of RHS vectors.
      */    
     static void manyRHS(const std::vector<double>& a,
                               const std::vector<double>& b,
                               std::vector<double>& c,
-                              dimArray<double>& d,
+                              DimArray<double>& d,
                               const int n_row, 
                               const int n_sys) {
 
@@ -117,14 +117,14 @@ public:
      * @param a Lower-diagonal (size n).
      * @param b Diagonal (size n).
      * @param c Upper-diagonal (size n), overwritten.
-     * @param d RHS stored in dimArray (n_row × n_sys), overwritten.
+     * @param d RHS stored in DimArray (n_row × n_sys), overwritten.
      * @param n_row Number of rows.
      * @param n_sys Number of RHS vectors.
      */
     static void manyRHSCyclic(const std::vector<double>& a,
                               const std::vector<double>& b,
                               std::vector<double>& c,
-                              dimArray<double>& d,
+                              DimArray<double>& d,
                               const int n_row, 
                               const int n_sys) {
     

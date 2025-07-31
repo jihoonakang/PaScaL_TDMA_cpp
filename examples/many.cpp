@@ -14,12 +14,12 @@ constexpr double a_lower = -1.0;
 
 using namespace PaScaL_TDMA;
 
-void generateRHS(dimArray<double>& D, dimArray<double>& X, int Nx, int Ny);
+void generateRHS(DimArray<double>& D, DimArray<double>& X, int Nx, int Ny);
 
-void distributeRHS(dimArray<double>& d_sub, const dimArray<double>& d,
+void distributeRHS(DimArray<double>& d_sub, const DimArray<double>& d,
                    const DomainLayout2D& dom, const CommLayout2D& topo);
 
-void collectSolution(dimArray<double>& d, const dimArray<double>& d_sub,
+void collectSolution(DimArray<double>& d, const DimArray<double>& d_sub,
                      const DomainLayout2D& dom, const CommLayout2D& topo);
 
 int main(int argc, char** argv) {
@@ -56,15 +56,15 @@ int main(int argc, char** argv) {
 
     topo.buildCommBufferInfo(nx_sub, ny_sub);
 
-    dimArray<double> d, x;
+    DimArray<double> d, x;
     if (is_root)
         generateRHS(d, x, nx, ny);
 
-    dimArray<double> d_sub(nx_sub, ny_sub), x_sub(nx_sub, ny_sub);
+    DimArray<double> d_sub(nx_sub, ny_sub), x_sub(nx_sub, ny_sub);
     distributeRHS(d_sub, d, dom, topo);
 
 // Solve in x-direction
-    dimArray<double> a_sub, b_sub, c_sub;
+    DimArray<double> a_sub, b_sub, c_sub;
     a_sub.assign(nx_sub, ny_sub, a_lower);
     b_sub.assign(nx_sub, ny_sub, a_diag);
     c_sub.assign(nx_sub, ny_sub, a_upper);
@@ -75,7 +75,7 @@ int main(int argc, char** argv) {
     px_many.destroy();
 
     // Solve in y-direction
-    dimArray<double> d_sub_tr(ny_sub, nx_sub);
+    DimArray<double> d_sub_tr(ny_sub, nx_sub);
 
     for (int i = 0; i < nx_sub; i++)
         for (int j = 0; j < ny_sub; j++)
@@ -107,10 +107,10 @@ int main(int argc, char** argv) {
     return 0;
 }
 
-void generateRHS(dimArray<double>& D, dimArray<double>& X, int Nx, int Ny) {
+void generateRHS(DimArray<double>& D, DimArray<double>& X, int Nx, int Ny) {
 
-    dimArray<double> A, B, C;
-    dimArray<double> Y(Nx, Ny);
+    DimArray<double> A, B, C;
+    DimArray<double> Y(Nx, Ny);
 
     A.assign(Nx, Ny, a_lower);
     B.assign(Nx, Ny, a_diag);
@@ -153,7 +153,7 @@ void generateRHS(dimArray<double>& D, dimArray<double>& X, int Nx, int Ny) {
         D(Nx - 1, j) = A(Nx - 1, j) * Y(Nx - 2, j) + B(Nx - 1, j) * Y(Nx - 1, j);
 }
 
-void distributeRHS(dimArray<double>& d_sub, const dimArray<double>& d,
+void distributeRHS(DimArray<double>& d_sub, const DimArray<double>& d,
                    const DomainLayout2D& dom, const CommLayout2D& topo) {
 
     std::vector<double> d_blk;
@@ -196,7 +196,7 @@ void distributeRHS(dimArray<double>& d_sub, const dimArray<double>& d,
             d_sub(i, j) = recv_blk[i * ny_sub + j];
 }
 
-void collectSolution(dimArray<double>& d, const dimArray<double>& d_sub,
+void collectSolution(DimArray<double>& d, const DimArray<double>& d_sub,
                      const DomainLayout2D& dom, const CommLayout2D& topo) {
 
     std::vector<double> d_blk;

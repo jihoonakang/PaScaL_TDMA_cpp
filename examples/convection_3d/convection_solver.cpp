@@ -1,6 +1,6 @@
 #include "convection_solver.hpp"
 
-void ConvectionSolver::solveThetaMany(dimArray<double>& theta,
+void ConvectionSolver::solveThetaMany(DimArray<double>& theta,
                     const DomainLayout3D& dom3D,
                     const CommLayout3D& com3D,
                     const GlobalParams& params) {
@@ -29,10 +29,10 @@ void ConvectionSolver::solveThetaMany(dimArray<double>& theta,
     const std::vector<int> jpbc_index = dom3D.getUpperBoundaryFlags();
     const std::vector<int> jmbc_index = dom3D.getLowerBoundaryFlags();
 
-    const dimArray<double> thetaBC3_sub = dom3D.getLowerBoundaryValues();
-    const dimArray<double> thetaBC4_sub = dom3D.getUpperBoundaryValues();
+    const DimArray<double> thetaBC3_sub = dom3D.getLowerBoundaryValues();
+    const DimArray<double> thetaBC4_sub = dom3D.getUpperBoundaryValues();
 
-    dimArray<double> rhs(nx_sub + 1, ny_sub + 1, nz_sub + 1);
+    DimArray<double> rhs(nx_sub + 1, ny_sub + 1, nz_sub + 1);
 
     for (int time_step = 1; time_step <= Tmax; time_step++) {
         t_curr += dt;
@@ -96,10 +96,10 @@ void ConvectionSolver::solveThetaMany(dimArray<double>& theta,
         // -----------------------
         // z-direction (i-j planes)
 
-        dimArray<double> ap(nz_sub - 1, ny_sub - 1); //(n_row, n_sys)
-        dimArray<double> am(nz_sub - 1, ny_sub - 1);
-        dimArray<double> ac(nz_sub - 1, ny_sub - 1);
-        dimArray<double> ad(nz_sub - 1, ny_sub - 1);
+        DimArray<double> ap(nz_sub - 1, ny_sub - 1); //(n_row, n_sys)
+        DimArray<double> am(nz_sub - 1, ny_sub - 1);
+        DimArray<double> ac(nz_sub - 1, ny_sub - 1);
+        DimArray<double> ad(nz_sub - 1, ny_sub - 1);
 
         PaScaL_TDMA::PTDMAPlanMany pz;
         pz.create(nz_sub - 1, ny_sub - 1, com3D.getCommZ(), PaScaL_TDMA::TDMAType::Cyclic);

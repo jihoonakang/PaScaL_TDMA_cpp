@@ -1,8 +1,8 @@
 /**
  * @file cuManyRHS.cpp
- * @brief Example for GPU-accelerated distributed TDMA (many right-hand sides, multi-vector) using cuPaScaL_TDMA and MPI.
+ * @brief Example for GPU-accelerated distributed TDMA (many right-hand sides, multi-vector) using CuPaScaL_TDMA and MPI.
  *
- * This example demonstrates the use of cuPaScaL_TDMA for solving a distributed multi-RHS tridiagonal system on GPUs,
+ * This example demonstrates the use of CuPaScaL_TDMA for solving a distributed multi-RHS tridiagonal system on GPUs,
  * comparing the results to the CPU (PaScaL_TDMA) solver for validation.
  */
 
@@ -15,7 +15,7 @@
 #include "cuda_env.hpp"
 
 /**
- * @brief Main entry point for the cuPaScaL_TDMA many RHS GPU example.
+ * @brief Main entry point for the CuPaScaL_TDMA many RHS GPU example.
  *
  * Initializes MPI and CUDA, prepares multi-vector problem data, runs both CPU and GPU multi-RHS TDMA solvers,
  * and compares the results for accuracy.
@@ -46,9 +46,9 @@ int main(int argc, char** argv) {
     }
 
     // Initialize CUDA environment and report CUDA-aware MPI support
-    cudaEnv::initialize();
+    CudaEnv::initialize();
 
-    if (cudaEnv::isCudaAwareMPI()) {
+    if (CudaEnv::isCudaAwareMPI()) {
         if (!rank) std::cout << "[INFO] CUDA-Aware MPI is available." << std::endl;
     } else {
         if (!rank) std::cout << "[INFO] CUDA-Aware MPI is NOT available." << std::endl;
@@ -74,9 +74,9 @@ int main(int argc, char** argv) {
     px_many.destroy();
 
     // =====[ GPU solve: many RHS TDMA, cyclic boundary ]=====
-    cuPaScaL_TDMA::cuPTDMAPlanManyRHS px_cuMany;
-    px_cuMany.create(nx, ny, nz, MPI_COMM_WORLD, cuPaScaL_TDMA::TDMAType::Cyclic);
-    cuPaScaL_TDMA::cuPTDMASolverManyRHS::cuSolve(px_cuMany, a_d, b_d, c_d, d_d);
+    CuPaScaL_TDMA::CuPTDMAPlanManyRHS px_cuMany;
+    px_cuMany.create(nx, ny, nz, MPI_COMM_WORLD, CuPaScaL_TDMA::TDMAType::Cyclic);
+    CuPaScaL_TDMA::CuPTDMASolverManyRHS::cuSolve(px_cuMany, a_d, b_d, c_d, d_d);
     px_cuMany.destroy();
 
     // Copy the computed solution from device back to host

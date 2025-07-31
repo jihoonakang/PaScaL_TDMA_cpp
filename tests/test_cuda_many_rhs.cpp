@@ -1,8 +1,8 @@
 /**
  * @file test_cuda_many_rhs.cpp
- * @brief Unit test for GPU-accelerated distributed TDMA (many right-hand sides, multi-vector) using cuPaScaL_TDMA, MPI, and GoogleTest.
+ * @brief Unit test for GPU-accelerated distributed TDMA (many right-hand sides, multi-vector) using CuPaScaL_TDMA, MPI, and GoogleTest.
  *
- * This test compares the results of the CPU (PaScaL_TDMA) and GPU (cuPaScaL_TDMA) multi-RHS solvers for consistency.
+ * This test compares the results of the CPU (PaScaL_TDMA) and GPU (CuPaScaL_TDMA) multi-RHS solvers for consistency.
  * It checks if the GPU-accelerated multi-RHS TDMA solver produces numerically equivalent results to the CPU version.
  */
 
@@ -32,7 +32,7 @@ constexpr double a_lower = -1.0;
  * - ny:     Number of grid points in y direction
  * - nz:     Number of grid points in z direction
  */
-TEST(cuPaScaL_TDMA_manyRHS, Solve) {
+TEST(CuPaScaL_TDMA_manyRHS, Solve) {
 
     // Use global argc/argv as GoogleTest does not pass them directly
     extern int g_argc;
@@ -70,9 +70,9 @@ TEST(cuPaScaL_TDMA_manyRHS, Solve) {
     std::vector<double> d_h(N);
 
     // Initialize CUDA environment and print CUDA-aware MPI availability
-    cudaEnv::initialize();
+    CudaEnv::initialize();
 
-    if (cudaEnv::isCudaAwareMPI()) {
+    if (CudaEnv::isCudaAwareMPI()) {
         if (is_root) std::cout << "[INFO] CUDA-Aware MPI is available." << std::endl;
     } else {
         if (is_root) std::cout << "[INFO] CUDA-Aware MPI is NOT available." << std::endl;
@@ -102,9 +102,9 @@ TEST(cuPaScaL_TDMA_manyRHS, Solve) {
     px_many.destroy();
 
     // =====[ GPU solve ]=====
-    cuPaScaL_TDMA::cuPTDMAPlanManyRHS px_cuMany;
-    px_cuMany.create(nx_sub, ny, nz, MPI_COMM_WORLD, cuPaScaL_TDMA::TDMAType::Standard);
-    cuPaScaL_TDMA::cuPTDMASolverManyRHS::cuSolve(px_cuMany, a_d, b_d, c_d, d_d);
+    CuPaScaL_TDMA::CuPTDMAPlanManyRHS px_cuMany;
+    px_cuMany.create(nx_sub, ny, nz, MPI_COMM_WORLD, CuPaScaL_TDMA::TDMAType::Standard);
+    CuPaScaL_TDMA::CuPTDMASolverManyRHS::cuSolve(px_cuMany, a_d, b_d, c_d, d_d);
     px_cuMany.destroy();
 
     std::vector<double> d_h_out(N);

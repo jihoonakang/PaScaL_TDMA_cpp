@@ -7,8 +7,8 @@
  *  - Batched tridiagonal solvers (cuManyModifiedThomasMany, cuManyModifiedThomasManyRHS)
  *  - Reconstruction kernels (cuReconstructMany, cuReconstructManyRHS)
  *  - Slab transpose helpers for YZ<->XY communication
- *  - TDMA plan classes (cuPTDMAPlanMany, cuPTDMAPlanManyRHS)
- *  - Solver orchestration (cuPTDMASolverMany, cuPTDMASolverManyRHS)
+ *  - TDMA plan classes (CuPTDMAPlanMany, CuPTDMAPlanManyRHS)
+ *  - Solver orchestration (CuPTDMASolverMany, CuPTDMASolverManyRHS)
  *  - Serial dispatch utilities (cuBatchSolver, cuDispatchTDMASolver)
  */
 
@@ -492,7 +492,7 @@ __global__ void mem_detach_slab_yz(const double* __restrict__ slab_yz,
     }
 }
 
-namespace cuPaScaL_TDMA {
+namespace CuPaScaL_TDMA {
 
     /**
     * @brief Exchange an XY‐slab and reassemble it into a YZ‐slab.
@@ -574,7 +574,7 @@ namespace cuPaScaL_TDMA {
     * @brief Base-level create: not supported.
     * @throws std::runtime_error Always.
     */
-    void cuPTDMAPlanBase::create(int n_row, int ny_sys, int nz_sys, 
+    void CuPTDMAPlanBase::create(int n_row, int ny_sys, int nz_sys, 
                                  MPI_Comm comm_ptdma, TDMAType type_) {
         throw std::runtime_error("create(int, int, MPI_Comm, TDMAType) not implemented");
     }
@@ -583,7 +583,7 @@ namespace cuPaScaL_TDMA {
     // Plan Many
 
     /**
-    * @class cuPTDMAPlanMany
+    * @class CuPTDMAPlanMany
     * @brief Configuration and buffers for Many solver.
     */
 
@@ -596,7 +596,7 @@ namespace cuPaScaL_TDMA {
     * @param[in] comm_ptdma MPI communicator.
     * @param[in] type      Solver type.
     */    
-    void cuPTDMAPlanMany::create(int n_row, int ny_sys, int nz_sys, 
+    void CuPTDMAPlanMany::create(int n_row, int ny_sys, int nz_sys, 
                                  MPI_Comm comm_ptdma, TDMAType type) {
         
         n_row_ = n_row;
@@ -675,7 +675,7 @@ namespace cuPaScaL_TDMA {
     /**
     * @brief Free all device buffers for Many plan.
     */
-    void cuPTDMAPlanMany::destroy() {
+    void CuPTDMAPlanMany::destroy() {
 
         if (a_rd_d_ != nullptr) {
             cudaFree(a_rd_d_);
@@ -713,10 +713,10 @@ namespace cuPaScaL_TDMA {
     }    
 
     /**
-    * @class cuPTDMASolverMany
+    * @class CuPTDMASolverMany
     * @brief Orchestrates batched solve for Many.
     */
-    void cuPTDMASolverMany::cuSolve(cuPTDMAPlanMany& plan,
+    void CuPTDMASolverMany::cuSolve(CuPTDMAPlanMany& plan,
                         double* a, double* b, double* c, double* d) {
 
         const int n_row = plan.n_row_;
@@ -755,10 +755,10 @@ namespace cuPaScaL_TDMA {
     //-------------------------------------------------------------------------------
     // Plan ManyRHS
     /**
-    * @class cuPTDMAPlanManyRHS
+    * @class CuPTDMAPlanManyRHS
     * @brief Configuration and buffers for ManyRHS solver.
     */
-    void cuPTDMAPlanManyRHS::create(int n_row, int ny_sys, int nz_sys, 
+    void CuPTDMAPlanManyRHS::create(int n_row, int ny_sys, int nz_sys, 
                                     MPI_Comm comm_ptdma, TDMAType type) {
         
         n_row_ = n_row;
@@ -834,7 +834,7 @@ namespace cuPaScaL_TDMA {
         return;
     }
     
-    void cuPTDMAPlanManyRHS::destroy() {
+    void CuPTDMAPlanManyRHS::destroy() {
 
         if (a_rd_d_ != nullptr) {
             cudaFree(a_rd_d_);
@@ -872,10 +872,10 @@ namespace cuPaScaL_TDMA {
     }    
 
     /**
-    * @class cuPTDMASolverManyRHS
+    * @class CuPTDMASolverManyRHS
     * @brief Orchestrates batched solve for ManyRHS.
     */
-    void cuPTDMASolverManyRHS::cuSolve(cuPTDMAPlanManyRHS& plan,
+    void CuPTDMASolverManyRHS::cuSolve(CuPTDMAPlanManyRHS& plan,
                         double* a, double* b, double* c, double* d) {
 
         const int n_row = plan.n_row_;
@@ -930,18 +930,18 @@ namespace cuPaScaL_TDMA {
     void cuBatchSolver(double* a, double* b, double* c, double* d, int n_row, int ny, int nz) {
         if constexpr (batch_type == BatchType::Many) {
             if constexpr (tdma_type == TDMAType::Standard)
-                cuTDMASolver::cuMany(a, b, c, d, n_row, ny, nz);
+                CuTDMASolver::cuMany(a, b, c, d, n_row, ny, nz);
             else if constexpr (tdma_type == TDMAType::Cyclic)
-                cuTDMASolver::cuManyCyclic(a, b, c, d, n_row, ny, nz);
+                CuTDMASolver::cuManyCyclic(a, b, c, d, n_row, ny, nz);
             else 
                 static_assert(dependent_false<std::integral_constant<TDMAType, tdma_type>>,
                               "Unsupported TDMAType for BatchType::Many");
         }
         else if constexpr (batch_type == BatchType::ManyRHS) {
             if constexpr (tdma_type == TDMAType::Standard)
-                cuTDMASolver::cuManyRHS(a, b, c, d, n_row, ny, nz);
+                CuTDMASolver::cuManyRHS(a, b, c, d, n_row, ny, nz);
             else if constexpr (tdma_type == TDMAType::Cyclic)
-                cuTDMASolver::cuManyRHSCyclic(a, b, c, d, n_row, ny, nz);
+                CuTDMASolver::cuManyRHSCyclic(a, b, c, d, n_row, ny, nz);
             else 
                 static_assert(dependent_false<std::integral_constant<TDMAType, tdma_type>>,
                               "Unsupported TDMAType for BatchType::Many");
@@ -977,10 +977,10 @@ namespace cuPaScaL_TDMA {
     template void cuBatchSolver<TDMAType::Cyclic, BatchType::ManyRHS>(
         double*, double*, double*, double*, int, int, int);
 
-    template void transposeSlabXYtoYZ<cuPTDMAPlanMany>(
-        const cuPTDMAPlanMany&, const double*, double* );
+    template void transposeSlabXYtoYZ<CuPTDMAPlanMany>(
+        const CuPTDMAPlanMany&, const double*, double* );
 
-    template void transposeSlabXYtoYZ<cuPTDMAPlanManyRHS>(
-        const cuPTDMAPlanManyRHS&, const double*, double* );
+    template void transposeSlabXYtoYZ<CuPTDMAPlanManyRHS>(
+        const CuPTDMAPlanManyRHS&, const double*, double* );
 
 };

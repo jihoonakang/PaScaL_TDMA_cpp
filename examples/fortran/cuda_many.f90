@@ -1,7 +1,7 @@
 program cuMany
     use mpi
     use iso_c_binding
-    use cuda_fortran_interface   ! cuPTDMAPlanMany 관련 C 바인딩 인터페이스
+    use cuda_fortran_interface   ! CuPTDMAPlanMany 관련 C 바인딩 인터페이스
     use fortran_interface     ! PTDMAPlanMany 관련 CPU 인터페이스
     implicit none
 

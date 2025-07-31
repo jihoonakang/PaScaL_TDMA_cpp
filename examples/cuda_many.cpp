@@ -1,6 +1,6 @@
 /**
  * @file cuMany.cpp
- * @brief Example for GPU-accelerated distributed TDMA (many right-hand sides) using cuPaScaL_TDMA and MPI.
+ * @brief Example for GPU-accelerated distributed TDMA (many right-hand sides) using CuPaScaL_TDMA and MPI.
  *
  * This example demonstrates how to set up, solve, and compare the results of CPU and GPU solvers for a large TDMA system in parallel, using CUDA-aware MPI.
  */
@@ -14,7 +14,7 @@
 #include "cuda_env.hpp"
 
 /**
- * @brief Main entry point for the cuPaScaL_TDMA many RHS GPU example.
+ * @brief Main entry point for the CuPaScaL_TDMA many RHS GPU example.
  *
  * Initializes MPI and CUDA, prepares problem data, runs both CPU and GPU TDMA solvers, 
  * and compares the results for accuracy.
@@ -40,9 +40,9 @@ int main(int argc, char** argv) {
     std::vector<double> d_h(N);
 
     // Initialize CUDA environment (check CUDA-aware MPI)
-    cudaEnv::initialize();
+    CudaEnv::initialize();
 
-    if (cudaEnv::isCudaAwareMPI()) {
+    if (CudaEnv::isCudaAwareMPI()) {
         if (!rank) std::cout << "[INFO] CUDA-Aware MPI is available." << std::endl;
     } else {
         if (!rank) std::cout << "[INFO] CUDA-Aware MPI is NOT available." << std::endl;
@@ -73,9 +73,9 @@ int main(int argc, char** argv) {
     px_many.destroy();
 
     // =====[ GPU solve ]=====
-    cuPaScaL_TDMA::cuPTDMAPlanMany px_cuMany;
-    px_cuMany.create(nx, ny, nz, MPI_COMM_WORLD, cuPaScaL_TDMA::TDMAType::Standard);
-    cuPaScaL_TDMA::cuPTDMASolverMany::cuSolve(px_cuMany, a_d, b_d, c_d, d_d);
+    CuPaScaL_TDMA::CuPTDMAPlanMany px_cuMany;
+    px_cuMany.create(nx, ny, nz, MPI_COMM_WORLD, CuPaScaL_TDMA::TDMAType::Standard);
+    CuPaScaL_TDMA::CuPTDMASolverMany::cuSolve(px_cuMany, a_d, b_d, c_d, d_d);
     px_cuMany.destroy();
 
     // Copy the computed solution from device back to host

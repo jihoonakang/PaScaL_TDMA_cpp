@@ -46,7 +46,7 @@ inline int paraRangeN(int first, int last, int size, int rank) noexcept {
  * @param[out] end Computed ending index for this rank.
  * @return Number of elements assigned to 'rank'.
  */
-inline int para_range(int n, int size, int rank, int &sta, int &end) noexcept {
+inline int paraRange(int n, int size, int rank, int &sta, int &end) noexcept {
     const int base = n / size;
     const int remainder = n % size;
     sta = base * rank + std::min(rank, remainder);

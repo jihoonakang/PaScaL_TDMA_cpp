@@ -36,9 +36,9 @@ int main(int argc, char** argv) {
     GlobalParams param(filename, is_root);
     CommLayout3D comm(dims, period);
     DomainLayout3D dom(param.nx, param.ny, param.nz, comm);
-    dimArray<double> theta_sub(dom.getParDimX() + 1, dom.getParDimY() + 1, dom.getParDimZ() + 1);
+    DimArray<double> theta_sub(dom.getParDimX() + 1, dom.getParDimY() + 1, dom.getParDimZ() + 1);
 
-    comm.print_info();
+    comm.printInfo();
     dom.assignMesh(comm, param);
     dom.initializeField(theta_sub, comm, param);
     dom.assignBoundaries(theta_sub, comm, param);

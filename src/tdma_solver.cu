@@ -1,6 +1,6 @@
 /**
  * @file tdma_solver.cu
- * @brief CUDA implementations for cuTDMASolver methods using custom kernels.
+ * @brief CUDA implementations for CuTDMASolver methods using custom kernels.
  */
 
 #include <cuda_runtime.h>
@@ -105,7 +105,7 @@ __global__ static void cuManyKernel(const double* __restrict__ a,
  *
  * Configures thread blocks, shared memory size, and synchronizes.
  */
-void cuTDMASolver::cuMany(const double* a_d, const double* b_d, 
+void CuTDMASolver::cuMany(const double* a_d, const double* b_d, 
                           double* c_d, double* d_d,
                           int nx, int ny, int nz) noexcept {
 
@@ -271,7 +271,7 @@ __global__ static void cuManyCyclicKernel(const double* __restrict__ a,
  *
  * Configures thread blocks, shared memory size, and synchronizes.
  */
-void cuTDMASolver::cuManyCyclic(const double* a_d, const double* b_d, 
+void CuTDMASolver::cuManyCyclic(const double* a_d, const double* b_d, 
                                 double* c_d, double* d_d,
                                 int nx, int ny, int nz) noexcept {
 
@@ -388,7 +388,7 @@ __global__ static void cuManyRHSKernel(const double* __restrict__ a,
  *
  * Configures thread blocks, shared memory size, and synchronizes.
  */
-void cuTDMASolver::cuManyRHS(const double* a_d, const double* b_d,
+void CuTDMASolver::cuManyRHS(const double* a_d, const double* b_d,
                              double* c_d, double* d_d,
                              int nx, int ny, int nz) noexcept {
 
@@ -533,7 +533,7 @@ __global__ static void cuManyRHSCyclicKernel(const double* __restrict__ a,
  *
  * Configures thread blocks, shared memory size, and synchronizes.
  */
-void cuTDMASolver::cuManyRHSCyclic(const double* a_d, const double* b_d, double* c_d,
+void CuTDMASolver::cuManyRHSCyclic(const double* a_d, const double* b_d, double* c_d,
                                    double* d_d, int nx, int ny, int nz) noexcept {
     assert(nx > 2 && ny > 0 && nz > 0);
 

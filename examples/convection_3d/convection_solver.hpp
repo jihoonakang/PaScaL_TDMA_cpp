@@ -8,7 +8,7 @@
 
 class ConvectionSolver {
     public:
-        static void solveThetaMany(dimArray<double>& theta,
+        static void solveThetaMany(DimArray<double>& theta,
                                    const DomainLayout3D& dom3D,
                                    const CommLayout3D& com3D,
                                    const GlobalParams& params);

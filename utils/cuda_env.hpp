@@ -13,12 +13,12 @@
 #include <cstdlib>
 
 /**
- * @class cudaEnv
+ * @class CudaEnv
  * @brief Manages CUDA environment setup and CUDA-Aware MPI detection.
  *
  * All methods are static since the environment is global across MPI processes.
  */
-class cudaEnv {
+class CudaEnv {
 public:
     /**
      * @brief Initialize CUDA and test MPI support.

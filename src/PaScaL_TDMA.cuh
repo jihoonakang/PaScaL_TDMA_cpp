@@ -14,7 +14,7 @@
 #include "dim_array.hpp"
 #include "util.hpp"
 
-namespace cuPaScaL_TDMA {
+namespace CuPaScaL_TDMA {
 
 /// Type of TDMA solver: standard or cyclic (periodic)
 enum class TDMAType { Standard, Cyclic };
@@ -23,10 +23,10 @@ enum class TDMAType { Standard, Cyclic };
 enum class BatchType { Single, Many, ManyRHS };
 
 /**
- * @class cuPTDMAPlanBase
+ * @class CuPTDMAPlanBase
  * @brief Base GPU plan holding MPI communicator and solve type.
  */
-class cuPTDMAPlanBase {
+class CuPTDMAPlanBase {
 
 protected:
     MPI_Comm comm_ptdma_ = MPI_COMM_NULL;   ///< Sub-communicator
@@ -35,7 +35,7 @@ protected:
     TDMAType type_;                         ///< Solver type
 
 public:
-    virtual ~cuPTDMAPlanBase() = default;
+    virtual ~CuPTDMAPlanBase() = default;
 
     /**
      * @brief Initialize plan dimensions and MPI communicator.
@@ -55,11 +55,11 @@ public:
 };
 
 /**
- * @class cuPTDMAPlanMany
+ * @class CuPTDMAPlanMany
  * @brief GPU plan for many independent TDMA systems.
- */class cuPTDMAPlanMany : public cuPTDMAPlanBase {
+ */class CuPTDMAPlanMany : public CuPTDMAPlanBase {
 
-    friend class cuPTDMASolverMany;
+    friend class CuPTDMASolverMany;
 
     template<typename PlanType>
     friend void transposeSlabYZtoXY(const PlanType&, const double*, double*);
@@ -91,7 +91,7 @@ private:
     double *c_rt_d_ = nullptr, *d_rt_d_ = nullptr;  ///< transposed system
 
 public:
-    using cuPTDMAPlanBase::create;
+    using CuPTDMAPlanBase::create;
     void create(int n_row_, int ny_sys_, int nz_sys_, MPI_Comm comm_ptdma_, 
                 TDMAType type_) override;
     void destroy() override;
@@ -101,45 +101,45 @@ public:
 };
 
 /**
- * @class cuPTDMASolverMany
+ * @class CuPTDMASolverMany
  * @brief GPU solver for many independent TDMA systems.
  */
-class cuPTDMASolverMany {
+class CuPTDMASolverMany {
 public:
     // /**
     //  * @brief Transpose slab from (Y,Z) layout to (X,Y)
     //  */
-    // static void transposeSlabYZtoXY(const cuPTDMAPlanMany& plan,
+    // static void transposeSlabYZtoXY(const CuPTDMAPlanMany& plan,
     //                         const double* slab_yz,
     //                         double* slab_xy);
     // /**
     //  * @brief Transpose slab from (X,Y) back to (Y,Z)
     //  */
-    // static void transposeSlabXYtoYZ(const cuPTDMAPlanMany& plan,
+    // static void transposeSlabXYtoYZ(const CuPTDMAPlanMany& plan,
     //                         const double* slab_xy,
     //                         double* slab_yz);
     /**
      * @brief Launch CUDA kernels to solve all systems
      */
-    static void cuSolve(cuPTDMAPlanMany& plan,
+    static void cuSolve(CuPTDMAPlanMany& plan,
                         double* A, double* B, double* C, double* D);
 
     /**
      * @brief Inline wrapper accepting std::vector references
      */
-    static inline void cuSolve(cuPTDMAPlanMany& plan, 
+    static inline void cuSolve(CuPTDMAPlanMany& plan, 
                                 std::vector<double>& A, std::vector<double>& B, 
                                 std::vector<double>& C, std::vector<double>& D)
     { cuSolve(plan, A.data(), B.data(), C.data(), D.data()); }
 };
 
 /**
- * @class cuPTDMAPlanManyRHS
+ * @class CuPTDMAPlanManyRHS
  * @brief GPU plan for many RHS batched TDMA with shared diagonals.
  */
-class cuPTDMAPlanManyRHS : public cuPTDMAPlanBase {
+class CuPTDMAPlanManyRHS : public CuPTDMAPlanBase {
 
-    friend class cuPTDMASolverManyRHS;
+    friend class CuPTDMASolverManyRHS;
 
     template<typename PlanType>
     friend void transposeSlabYZtoXY(const PlanType&, const double*, double*);
@@ -171,7 +171,7 @@ private:
     double *c_rt_d_ = nullptr, *d_rt_d_ = nullptr;  ///< transposed system
 
 public:
-    using cuPTDMAPlanBase::create;
+    using CuPTDMAPlanBase::create;
     void create(int n_row, int ny_sys, int nz_sys, MPI_Comm comm_ptdma, 
                 TDMAType type) override;
     void destroy() override;
@@ -181,39 +181,39 @@ public:
 };
 
 /**
- * @class cuPTDMASolverManyRHS
+ * @class CuPTDMASolverManyRHS
  * @brief GPU solver for ManyRHS batched TDMA systems.
  */
-class cuPTDMASolverManyRHS {
+class CuPTDMASolverManyRHS {
 public:
     // /**
     //  * @brief Transpose slab from (Y,Z) layout to (X,Y)
     //  */
-    // static void transposeSlabYZtoXY(const cuPTDMAPlanManyRHS& plan,
+    // static void transposeSlabYZtoXY(const CuPTDMAPlanManyRHS& plan,
     //                         const double* slab_yz,
     //                         double* slab_xy);
     // /**
     //  * @brief Transpose slab from (X,Y) back to (Y,Z)
     //  */
-    // static void transposeSlabXYtoYZ(const cuPTDMAPlanManyRHS& plan,
+    // static void transposeSlabXYtoYZ(const CuPTDMAPlanManyRHS& plan,
     //                         const double* slab_xy,
     //                         double* slab_yz);
     /**
      * @brief Gather shared coefficients across ranks via MPI.
      */
-    static void allGather(const cuPTDMAPlanManyRHS& plan, 
+    static void allGather(const CuPTDMAPlanManyRHS& plan, 
                             const double* coef_rd,
                             double* coef_rt);
     /**
      * @brief Launch CUDA kernels to solve systems with many RHS.
      */
-    static void cuSolve(cuPTDMAPlanManyRHS& plan,
+    static void cuSolve(CuPTDMAPlanManyRHS& plan,
                         double* a, double* b, double* c, double* d);
 
     /**
      * @brief Inline wrapper accepting std::vector references
      */
-    static inline void cuSolve(cuPTDMAPlanManyRHS& plan, 
+    static inline void cuSolve(CuPTDMAPlanManyRHS& plan, 
                                 std::vector<double>& a, std::vector<double>& b, 
                                 std::vector<double>& c, std::vector<double>& d)
     { cuSolve(plan, a.data(), b.data(), c.data(), d.data()); }
@@ -248,4 +248,4 @@ public:
     extern template void cuBatchSolver<TDMAType::Cyclic, BatchType::ManyRHS>(
         double*, double*, double*, double*, int, int, int);
 
-} // namespace cuPaScaL_TDMA
+} // namespace CuPaScaL_TDMA

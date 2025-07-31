@@ -1,8 +1,8 @@
 /**
  * @file test_cuda_many.cpp
- * @brief Unit test for GPU-accelerated distributed TDMA (many right-hand sides) using cuPaScaL_TDMA, MPI, and GoogleTest.
+ * @brief Unit test for GPU-accelerated distributed TDMA (many right-hand sides) using CuPaScaL_TDMA, MPI, and GoogleTest.
  *
- * This test compares the results of the CPU (PaScaL_TDMA) and GPU (cuPaScaL_TDMA) solvers for consistency.
+ * This test compares the results of the CPU (PaScaL_TDMA) and GPU (CuPaScaL_TDMA) solvers for consistency.
  */
 
 #include <gtest/gtest.h>
@@ -32,7 +32,7 @@ constexpr double a_lower = -1.0;
  * - nz:     Number of grid points in z direction
  */
 
-TEST(cuPaScaL_TDMA_many, Solve) {
+TEST(CuPaScaL_TDMA_many, Solve) {
 
     // Read from global argc/argv (GoogleTest doesn't pass arguments to TEST directly)
     extern int g_argc;
@@ -71,9 +71,9 @@ TEST(cuPaScaL_TDMA_many, Solve) {
     std::vector<double> d_h(N);
 
     // Initialize CUDA environment and print CUDA-aware MPI availability
-    cudaEnv::initialize();
+    CudaEnv::initialize();
 
-    if (cudaEnv::isCudaAwareMPI()) {
+    if (CudaEnv::isCudaAwareMPI()) {
         if (is_root) std::cout << "[INFO] CUDA-Aware MPI is available." << std::endl;
     } else {
         if (is_root) std::cout << "[INFO] CUDA-Aware MPI is NOT available." << std::endl;
@@ -103,9 +103,9 @@ TEST(cuPaScaL_TDMA_many, Solve) {
     px_many.destroy();
 
     // =====[ GPU solve ]=====
-    cuPaScaL_TDMA::cuPTDMAPlanMany px_cuMany;
-    px_cuMany.create(nx_sub, ny, nz, MPI_COMM_WORLD, cuPaScaL_TDMA::TDMAType::Standard);
-    cuPaScaL_TDMA::cuPTDMASolverMany::cuSolve(px_cuMany, a_d, b_d, c_d, d_d);
+    CuPaScaL_TDMA::CuPTDMAPlanMany px_cuMany;
+    px_cuMany.create(nx_sub, ny, nz, MPI_COMM_WORLD, CuPaScaL_TDMA::TDMAType::Standard);
+    CuPaScaL_TDMA::CuPTDMASolverMany::cuSolve(px_cuMany, a_d, b_d, c_d, d_d);
     px_cuMany.destroy();
 
     std::vector<double> d_h_out(N);

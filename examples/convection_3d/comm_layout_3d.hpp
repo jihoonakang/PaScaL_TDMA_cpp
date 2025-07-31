@@ -146,7 +146,7 @@ public:
     const int getRankPrevZ() const { return comm_z.getRankPrev(); }
     const MPI_Comm& getCommZ() const { return comm_z.getComm(); }
 
-    void print_info() const {
+    void printInfo() const {
 
         for (size_t i = 0; i < size; i++) {
             if (i == rank) {

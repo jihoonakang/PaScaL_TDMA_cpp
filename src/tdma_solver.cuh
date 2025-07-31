@@ -10,11 +10,11 @@
 #include <cassert>
 
 /**
- * @class cuTDMASolver
+ * @class CuTDMASolver
  * @brief CUDA-based solvers for multiple tridiagonal systems.
  *
  */
-class cuTDMASolver {
+class CuTDMASolver {
 public:
     /// Solve many independent tridiagonal systems on the GPU.
     static void cuMany(

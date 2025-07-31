@@ -175,7 +175,7 @@ public:
     const std::vector<int>& getDisplAll() const noexcept { return displ_all_; }
 
 
-    void print_info() const noexcept {
+    void printInfo() const noexcept {
 
         for (size_t i = 0; i < size_; i++) {
             if (i == rank_) {
