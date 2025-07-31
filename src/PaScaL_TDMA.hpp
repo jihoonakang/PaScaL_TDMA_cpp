@@ -1,5 +1,5 @@
 /**
- * @file PaScaL_TDMA.hpp
+ * @file pascal_tdma.hpp
  * @brief High-level planner and solver dispatch for PaScaL_TDMA library.
  *
  * Defines plan classes for different TDMA batch types and solver wrappers
@@ -10,7 +10,7 @@
 
 #include <vector>
 #include <mpi.h>
-#include "dimArray.hpp"
+#include "dim_array.hpp"
 #include "util.hpp"
 
 namespace PaScaL_TDMA {

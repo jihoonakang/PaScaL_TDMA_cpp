@@ -25,7 +25,7 @@ namespace Util {
  * @param rank The rank for which to compute the block size.
  * @return Number of elements assigned to 'rank'.
  */
-inline int para_range_n(int first, int last, int size, int rank) noexcept {
+inline int paraRangeN(int first, int last, int size, int rank) noexcept {
     const int n = last - first + 1;
     const int base = n / size;
     const int remainder = n % size;

@@ -1,7 +1,7 @@
 #include <string>
 #include <iterator>
 #include "mpi.h"
-#include "convectionSolver.hpp"
+#include "convection_solver.hpp"
 
 using namespace PaScaL_TDMA;
 

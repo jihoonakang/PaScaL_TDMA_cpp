@@ -2,7 +2,7 @@ program main
 
     use mpi
     use iso_c_binding
-    use fortranInterface
+    use fortran_interface
     use mpi_topology_2D
 
     implicit none
@@ -82,7 +82,7 @@ program main
     call collect_solution_array()
 
     if (is_root) then
-        print *, "Avg. norm2 (norm2 / (nx * ny)) = ", norm2(d - x) / nx / ny
+        print *, "Avg. norm2 error = ", norm2(d - x) / nx / ny
     endif
 
     call dealloc_all()

@@ -1,5 +1,5 @@
 /**
- * @file testManyRHS.cpp
+ * @file test_many_rhs.cpp
  * @brief Unit test for distributed 3D TDMA (multiple right-hand sides) using MPI and GoogleTest.
  *
  * This test solves a 3D problem using TDMA sweeps along each dimension, distributed among MPI processes.
@@ -14,9 +14,9 @@
 #include <string>
 #include <stdexcept>
 
-#include "TDMASolver.hpp"
-#include "PaScaL_TDMA.hpp"
-#include "commLayout2D.hpp"
+#include "tdma_solver.hpp"
+#include "pascal_tdma.hpp"
+#include "comm_layout_2d.hpp"
 
 constexpr double tolerance = 1e-12;
 constexpr double a_diag = 10.0;

@@ -2,9 +2,9 @@
 #include <vector>
 #include <array>
 #include <mpi.h>
-#include "globalParams.hpp"
-#include "dimArray.hpp"
-#include "commLayout3D.hpp"
+#include "global_params.hpp"
+#include "dim_array.hpp"
+#include "comm_layout_3d.hpp"
 #include "util.hpp"
 
 class DomainLayout3D {

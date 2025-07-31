@@ -25,14 +25,14 @@ endfunction()
 # ===================[ Test Targets ]=======================
 
 # CPU tests
-add_pascal_test(testSingle    testSingle.cpp)
-add_pascal_test(testMany      testMany.cpp)
-add_pascal_test(testManyRHS   testManyRHS.cpp)
+add_pascal_test(test_single     test_single.cpp)
+add_pascal_test(test_many       test_many.cpp)
+add_pascal_test(test_many_rhs   test_many_rhs.cpp)
 
 # GPU tests
 if(CUDA)
-    add_cuPascal_test(testCuMany    testCuMany.cpp)
-    add_cuPascal_test(testCuManyRHS testCuManyRHS.cpp)
+    add_cuPascal_test(test_cuda_many        test_cuda_many.cpp)
+    add_cuPascal_test(test_cuda_many_rhs    test_cuda_many_rhs.cpp)
 endif()
 
 # ===================[ CTest Integration ]==================
@@ -40,23 +40,23 @@ endif()
 include(GoogleTest)
 
 # Register tests with mpirun and specific arguments
-add_test(NAME PaScaL_TDMA_single_p4_n100_kernel_standard COMMAND mpirun -np 4 $<TARGET_FILE:testSingle> 100 standard)
-add_test(NAME PaScaL_TDMA_single_p4_n100_kernel_cyclic COMMAND mpirun -np 4 $<TARGET_FILE:testSingle> 100 cyclic)
-add_test(NAME PaScaL_TDMA_single_p4_n1000_kernel_standard COMMAND mpirun -np 4 $<TARGET_FILE:testSingle> 1000 standard)
-add_test(NAME PaScaL_TDMA_single_p4_n1000_kernel_cyclic COMMAND mpirun -np 4 $<TARGET_FILE:testSingle> 1000 cyclic)
+add_test(NAME PaScaL_TDMA_single_p4_n100_kernel_standard COMMAND mpirun -np 4 $<TARGET_FILE:test_single> 100 standard)
+add_test(NAME PaScaL_TDMA_single_p4_n100_kernel_cyclic COMMAND mpirun -np 4 $<TARGET_FILE:test_single> 100 cyclic)
+add_test(NAME PaScaL_TDMA_single_p4_n1000_kernel_standard COMMAND mpirun -np 4 $<TARGET_FILE:test_single> 1000 standard)
+add_test(NAME PaScaL_TDMA_single_p4_n1000_kernel_cyclic COMMAND mpirun -np 4 $<TARGET_FILE:test_single> 1000 cyclic)
 
-add_test(NAME PaScaL_TDMA_many_p1_n100x100_kernel_standard COMMAND mpirun -np 1 $<TARGET_FILE:testMany> 100 100)
-add_test(NAME PaScaL_TDMA_many_p9_n500x500_kernel_standard COMMAND mpirun -np 9 $<TARGET_FILE:testMany> 500 500)
+add_test(NAME PaScaL_TDMA_many_p1_n100x100_kernel_standard COMMAND mpirun -np 1 $<TARGET_FILE:test_many> 100 100)
+add_test(NAME PaScaL_TDMA_many_p9_n500x500_kernel_standard COMMAND mpirun -np 9 $<TARGET_FILE:test_many> 500 500)
 
-add_test(NAME PaScaL_TDMA_many_RHS_p1_n10x10x10_kernel_standard COMMAND mpirun -np 1 $<TARGET_FILE:testManyRHS> 10 10 10)
-add_test(NAME PaScaL_TDMA_many_RHS_p8_n100x100x100_kernel_standard COMMAND mpirun -np 8 $<TARGET_FILE:testManyRHS> 20 20 20)
+add_test(NAME PaScaL_TDMA_many_RHS_p1_n10x10x10_kernel_standard COMMAND mpirun -np 1 $<TARGET_FILE:test_many_rhs> 10 10 10)
+add_test(NAME PaScaL_TDMA_many_RHS_p8_n100x100x100_kernel_standard COMMAND mpirun -np 8 $<TARGET_FILE:test_many_rhs> 20 20 20)
 
 if(CUDA)
-    add_test(NAME PaScaL_TDMA_cuda_many_p1_n10x20x20_kernel_standard COMMAND mpirun -np 1 $<TARGET_FILE:testCuMany> 10 40 40)
-    add_test(NAME PaScaL_TDMA_cuda_many_p4_n10x32x64_kernel_standard COMMAND mpirun -np 4 $<TARGET_FILE:testCuMany> 10 32 64)
-    add_test(NAME PaScaL_TDMA_cuda_many_RHS_p1_n10x20x20_kernel_standard COMMAND mpirun -np 1 $<TARGET_FILE:testCuManyRHS> 10 40 40)
-    add_test(NAME PaScaL_TDMA_cuda_many_RHS_p4_n10x32x64_kernel_standard COMMAND mpirun -np 4 $<TARGET_FILE:testCuManyRHS> 10 32 64)
+    add_test(NAME PaScaL_TDMA_cuda_many_p1_n10x20x20_kernel_standard COMMAND mpirun -np 1 $<TARGET_FILE:test_cuda_many> 10 40 40)
+    add_test(NAME PaScaL_TDMA_cuda_many_p4_n10x32x64_kernel_standard COMMAND mpirun -np 4 $<TARGET_FILE:test_cuda_many> 10 32 64)
+    add_test(NAME PaScaL_TDMA_cuda_many_RHS_p1_n10x20x20_kernel_standard COMMAND mpirun -np 1 $<TARGET_FILE:test_cuda_many_rhs> 10 40 40)
+    add_test(NAME PaScaL_TDMA_cuda_many_RHS_p4_n10x32x64_kernel_standard COMMAND mpirun -np 4 $<TARGET_FILE:test_cuda_many_rhs> 10 32 64)
 endif()
 
 # For automatic GoogleTest discovery, uncomment if needed:
-# gtest_discover_tests(testSingle)
+# gtest_discover_tests(test_single)

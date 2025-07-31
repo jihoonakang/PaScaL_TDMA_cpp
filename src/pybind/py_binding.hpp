@@ -8,7 +8,7 @@
 #include "mpi.h"
 #include "pybind11/pybind11.h"
 #include <pybind11/numpy.h>
-#include "PaScaL_TDMA.hpp"
+#include "pascal_tdma.hpp"
 
 namespace py = pybind11;
 namespace PaScaL_TDMA {

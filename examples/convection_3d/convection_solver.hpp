@@ -1,10 +1,10 @@
 #include <vector>
 #include <iostream>
 #include <mpi.h>
-#include "globalParams.hpp"
-#include "domainLayout3D.hpp"
-#include "commLayout3D.hpp"
-#include "PaScaL_TDMA.hpp"
+#include "global_params.hpp"
+#include "domain_layout_3d.hpp"
+#include "comm_layout_3d.hpp"
+#include "pascal_tdma.hpp"
 
 class ConvectionSolver {
     public:

@@ -5,7 +5,7 @@
 #include <string>
 #include <stdexcept>
 
-#include "PaScaL_TDMA.hpp"
+#include "pascal_tdma.hpp"
 
 constexpr double a_diag = 10.0;
 constexpr double a_upper = -1.0;
@@ -46,7 +46,7 @@ int main(int argc, char** argv) {
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     const bool is_root = (rank == root);
 
-    int n_sub = Util::para_range_n(1, n, size, rank);
+    int n_sub = Util::paraRangeN(1, n, size, rank);
 
     std::vector<int> cnt(size), disp(size);
     MPI_Gather(&n_sub, 1, MPI_INT, cnt.data(), 1, MPI_INT, root, MPI_COMM_WORLD);

@@ -1,5 +1,5 @@
-#include "cuPaScaL_TDMA_C_interface.hpp"
-#include "PaScaL_TDMA.cuh"
+#include "cuda_pascal_tdma_c_interface.hpp"
+#include "pascal_tdma.cuh"
 #include <mpi.h>
 #include <cstdlib>
 #include <cstdio>

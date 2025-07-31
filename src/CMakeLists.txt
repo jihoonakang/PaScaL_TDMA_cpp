@@ -5,14 +5,14 @@ add_library(PaScaL_TDMA STATIC)
 
 # Add source files (CUDA sources only when enabled)
 target_sources(PaScaL_TDMA PRIVATE
-    PaScaL_TDMA.cpp
-    $<$<BOOL:${CUDA}>:TDMASolver.cu>
-    $<$<BOOL:${CUDA}>:PaScaL_TDMA.cu>
+    pascal_tdma.cpp
+    $<$<BOOL:${CUDA}>:tdma_solver.cu>
+    $<$<BOOL:${CUDA}>:pascal_tdma.cu>
 )
 
 # Mark CUDA headers for compilation when CUDA is enabled
 if(CUDA)
-    set_source_files_properties(TDMASolver.cuh PaScaL_TDMA.cuh 
+    set_source_files_properties(tdma_solver.cuh pascal_tdma.cuh 
                                 PROPERTIES LANGUAGE CUDA)
 endif()
 

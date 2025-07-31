@@ -1,4 +1,4 @@
-#include "domainLayout3D.hpp"
+#include "domain_layout_3d.hpp"
 
 
 DomainLayout3D::DomainLayout3D( const int nx_, const int ny_, const int nz_,

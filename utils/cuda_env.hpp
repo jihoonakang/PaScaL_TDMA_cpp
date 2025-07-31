@@ -1,5 +1,5 @@
 /**
- * @file cudaEnv.hpp
+ * @file cuda_env.hpp
  * @brief Initializes CUDA environment and verifies CUDA-Aware MPI support.
  *
  * Provides functions to check GPU availability, display device information,

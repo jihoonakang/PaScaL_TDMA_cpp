@@ -1,12 +1,12 @@
 /**
- * @file testSingle.cpp
+ * @file test_single.cpp
  * @brief Unit test for single TDMA solve (standard or cyclic) using MPI and GoogleTest.
  * 
  * This test distributes a tridiagonal linear system to multiple MPI processes,
  * solves it using the PaScaL_TDMA solver, and checks the results against the exact solution.
  */
 
-#include "PaScaL_TDMA.hpp"
+#include "pascal_tdma.hpp"
 #include <gtest/gtest.h>
 #include <vector>
 #include <cmath>
@@ -108,7 +108,7 @@ TEST(PaScaL_TDMA_single, Test) {
     const bool is_root = (rank == root);
 
     // Calculate subdomain size for each process
-    int n_sub = Util::para_range_n(1, n, size, rank);
+    int n_sub = Util::paraRangeN(1, n, size, rank);
 
     // Prepare counts and displacements for MPI scatter/gather
     std::vector<int> cnt(size), disp(size);

@@ -1,5 +1,5 @@
 /**
- * @file TDMASolver.hpp
+ * @file tdma_solver.hpp
  * @brief Solver routines for tridiagonal and cyclic tridiagonal systems.
  *
  * Implements the Thomas algorithm and its variants for single,
@@ -9,7 +9,7 @@
 
 #include <vector>
 #include <cassert>
-#include "dimArray.hpp"
+#include "dim_array.hpp"
 
 /**
  * @class TDMASolver

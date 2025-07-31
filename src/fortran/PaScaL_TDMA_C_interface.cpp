@@ -1,5 +1,5 @@
-#include "PaScaL_TDMA_C_interface.hpp"
-#include "PaScaL_TDMA.hpp"
+#include "pascal_tdma_c_interface.hpp"
+#include "pascal_tdma.hpp"
 #include <mpi.h>
 
 using namespace PaScaL_TDMA;

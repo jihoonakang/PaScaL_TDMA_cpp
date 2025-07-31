@@ -1,5 +1,5 @@
 /**
- * @file CommLayout2D.hpp
+ * @file comm_layout_2d.hpp
  * @brief Defines 2D MPI communicator topology and related layout functions.
  *
  * Provides classes to create Cartesian sub-communicators in X/Y directions,
@@ -216,8 +216,8 @@ public:
 
         dim_xy_ = dim_x_ * dim_y_;
 
-        par_dim_x_ = Util::para_range_n(1, dim_x_, topo.getSizeX(), topo.getRankX());
-        par_dim_y_ = Util::para_range_n(1, dim_y_, topo.getSizeY(), topo.getRankY());
+        par_dim_x_ = Util::paraRangeN(1, dim_x_, topo.getSizeX(), topo.getRankX());
+        par_dim_y_ = Util::paraRangeN(1, dim_y_, topo.getSizeY(), topo.getRankY());
         par_dim_xy_ = par_dim_x_ * par_dim_y_;
 
     }
@@ -257,8 +257,8 @@ public:
 
         dim_xyz_ = dim_x_ * dim_y_ * dim_z_;
 
-        par_dim_x_ = Util::para_range_n(1, dim_x_, topo.getSizeX(), topo.getRankX());
-        par_dim_y_ = Util::para_range_n(1, dim_y_, topo.getSizeY(), topo.getRankY());
+        par_dim_x_ = Util::paraRangeN(1, dim_x_, topo.getSizeX(), topo.getRankX());
+        par_dim_y_ = Util::paraRangeN(1, dim_y_, topo.getSizeY(), topo.getRankY());
         par_dim_z_ = dim_z_;     // no decomposition in Z dimension
         par_dim_xyz_ = par_dim_x_ * par_dim_y_ * par_dim_z_;
 

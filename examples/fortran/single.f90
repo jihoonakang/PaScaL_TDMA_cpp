@@ -2,7 +2,7 @@ program main
 
     use mpi
     use iso_c_binding
-    use fortranInterface
+    use fortran_interface
 
     implicit none
 
@@ -55,7 +55,7 @@ program main
                       MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
 
     if (is_root) then
-        print *, "Avg. norm2 ( norm2 / N )= ", norm2(d - x) / N
+        print *, "Avg. norm2 error = ", norm2(d - x) / N
     endif
 
     call dealloc_all()

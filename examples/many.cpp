@@ -5,8 +5,8 @@
 #include <string>
 #include <stdexcept>
 
-#include "PaScaL_TDMA.hpp"
-#include "commLayout2D.hpp"
+#include "pascal_tdma.hpp"
+#include "comm_layout_2d.hpp"
 
 constexpr double a_diag = 10.0;
 constexpr double a_upper = -1.0;

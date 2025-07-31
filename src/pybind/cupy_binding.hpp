@@ -9,7 +9,7 @@
 
 #include <mpi.h>
 #include <pybind11/pybind11.h>
-#include "../PaScaL_TDMA.cuh"
+#include "../pascal_tdma.cuh"
 
 namespace py = pybind11;
 namespace cuTDMA = cuPaScaL_TDMA;

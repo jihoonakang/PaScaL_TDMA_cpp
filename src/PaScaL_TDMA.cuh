@@ -1,5 +1,5 @@
 /**
- * @file PaScaL_TDMA.cuh
+ * @file pascal_tdma.cuh
  * @brief CUDA planner and solver dispatch interfaces for PaScaL_TDMA.
  *
  * Declares GPU-specific plan and solver classes for batched TDMA
@@ -11,7 +11,7 @@
 #include <vector>
 #include <mpi.h>
 #include <cuda_runtime.h>
-#include "dimArray.hpp"
+#include "dim_array.hpp"
 #include "util.hpp"
 
 namespace cuPaScaL_TDMA {

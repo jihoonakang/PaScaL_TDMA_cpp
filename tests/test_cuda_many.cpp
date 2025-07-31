@@ -1,9 +1,8 @@
 /**
- * @file testCuManyRHS.cpp
- * @brief Unit test for GPU-accelerated distributed TDMA (many right-hand sides, multi-vector) using cuPaScaL_TDMA, MPI, and GoogleTest.
+ * @file test_cuda_many.cpp
+ * @brief Unit test for GPU-accelerated distributed TDMA (many right-hand sides) using cuPaScaL_TDMA, MPI, and GoogleTest.
  *
- * This test compares the results of the CPU (PaScaL_TDMA) and GPU (cuPaScaL_TDMA) multi-RHS solvers for consistency.
- * It checks if the GPU-accelerated multi-RHS TDMA solver produces numerically equivalent results to the CPU version.
+ * This test compares the results of the CPU (PaScaL_TDMA) and GPU (cuPaScaL_TDMA) solvers for consistency.
  */
 
 #include <gtest/gtest.h>
@@ -11,9 +10,9 @@
 #include <vector>
 #include <cmath>
 #include <cuda_runtime.h>
-#include "PaScaL_TDMA.cuh"
-#include "PaScaL_TDMA.hpp"
-#include "cudaEnv.hpp"
+#include "pascal_tdma.cuh"
+#include "pascal_tdma.hpp"
+#include "cuda_env.hpp"
 
 constexpr double tolerance = 1e-12;
 constexpr double a_diag = 10.0;
@@ -22,7 +21,7 @@ constexpr double a_lower = -1.0;
 
 /**
  * @test
- * @brief GPU-accelerated distributed TDMA (many RHS): compare CPU and GPU solver results.
+ * @brief GPU-accelerated distributed TDMA: compare CPU and GPU solver results.
  *
  * Reads problem size from command line, allocates/initializes data, solves with both CPU and GPU,
  * and checks the results for numerical agreement.
@@ -32,14 +31,15 @@ constexpr double a_lower = -1.0;
  * - ny:     Number of grid points in y direction
  * - nz:     Number of grid points in z direction
  */
-TEST(cuPaScaL_TDMA_manyRHS, Solve) {
 
-    // Use global argc/argv as GoogleTest does not pass them directly
+TEST(cuPaScaL_TDMA_many, Solve) {
+
+    // Read from global argc/argv (GoogleTest doesn't pass arguments to TEST directly)
     extern int g_argc;
     extern char** g_argv;
 
     if (g_argc != 4)
-        throw std::runtime_error("Usage: testManyRHS <nx_sub> <ny> <nz>");
+        throw std::runtime_error("Usage: testMany <nx_sub> <ny> <nz>");
 
     const int nx_sub = std::stoi(g_argv[1]);
     const int ny = std::stoi(g_argv[2]);
@@ -62,11 +62,12 @@ TEST(cuPaScaL_TDMA_manyRHS, Solve) {
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     bool is_root = (rank == 0);
 
-    // Host coefficient arrays: note only size nx_sub for a/b/c, but size N for d
     const int N = nx_sub * ny * nz;
-    std::vector<double> a_h(nx_sub, a_lower);
-    std::vector<double> b_h(nx_sub,  a_diag);
-    std::vector<double> c_h(nx_sub, a_upper);
+
+    // Host arrays for coefficients and solution vector
+    std::vector<double> a_h(N, a_lower);
+    std::vector<double> b_h(N,  a_diag);
+    std::vector<double> c_h(N, a_upper);
     std::vector<double> d_h(N);
 
     // Initialize CUDA environment and print CUDA-aware MPI availability
@@ -85,26 +86,26 @@ TEST(cuPaScaL_TDMA_manyRHS, Solve) {
 
     // Allocate device (GPU) memory and copy values in host memory
     double *a_d, *b_d, *c_d, *d_d;
-    cudaMalloc(&a_d, nx_sub * sizeof(double));
-    cudaMalloc(&b_d, nx_sub * sizeof(double));
-    cudaMalloc(&c_d, nx_sub * sizeof(double));
-    cudaMalloc(&d_d, N * sizeof(double));
+    cudaMalloc((void**)&a_d, N * sizeof(double));
+    cudaMalloc((void**)&b_d, N * sizeof(double));
+    cudaMalloc((void**)&c_d, N * sizeof(double));
+    cudaMalloc((void**)&d_d, N * sizeof(double));
 
-    cudaMemcpy(a_d, a_h.data(), nx_sub * sizeof(double), cudaMemcpyHostToDevice);
-    cudaMemcpy(b_d, b_h.data(), nx_sub * sizeof(double), cudaMemcpyHostToDevice);
-    cudaMemcpy(c_d, c_h.data(), nx_sub * sizeof(double), cudaMemcpyHostToDevice);
+    cudaMemcpy(a_d, a_h.data(), N * sizeof(double), cudaMemcpyHostToDevice);
+    cudaMemcpy(b_d, b_h.data(), N * sizeof(double), cudaMemcpyHostToDevice);
+    cudaMemcpy(c_d, c_h.data(), N * sizeof(double), cudaMemcpyHostToDevice);
     cudaMemcpy(d_d, d_h.data(), N * sizeof(double), cudaMemcpyHostToDevice);
 
     // =====[ CPU reference solve ]=====
-    PaScaL_TDMA::PTDMAPlanManyRHS px_many;
+    PaScaL_TDMA::PTDMAPlanMany px_many;
     px_many.create(nx_sub, ny*nz, MPI_COMM_WORLD, PaScaL_TDMA::TDMAType::Standard);
-    PaScaL_TDMA::PTDMASolverManyRHS::solve(px_many, a_h, b_h, c_h, d_h);
+    PaScaL_TDMA::PTDMASolverMany::solve(px_many, a_h, b_h, c_h, d_h);
     px_many.destroy();
 
     // =====[ GPU solve ]=====
-    cuPaScaL_TDMA::cuPTDMAPlanManyRHS px_cuMany;
+    cuPaScaL_TDMA::cuPTDMAPlanMany px_cuMany;
     px_cuMany.create(nx_sub, ny, nz, MPI_COMM_WORLD, cuPaScaL_TDMA::TDMAType::Standard);
-    cuPaScaL_TDMA::cuPTDMASolverManyRHS::cuSolve(px_cuMany, a_d, b_d, c_d, d_d);
+    cuPaScaL_TDMA::cuPTDMASolverMany::cuSolve(px_cuMany, a_d, b_d, c_d, d_d);
     px_cuMany.destroy();
 
     std::vector<double> d_h_out(N);
@@ -119,7 +120,7 @@ TEST(cuPaScaL_TDMA_manyRHS, Solve) {
     if(is_root) std::cout << "Total error: " << error << std::endl;
 
     cudaFree(a_d); cudaFree(b_d); cudaFree(c_d); cudaFree(d_d);
-
+    
     // Assert: Each value within tolerance
     for (int i = 0; i < N; i++) {
         EXPECT_NEAR(d_h[i], d_h_out[i], tolerance) << 

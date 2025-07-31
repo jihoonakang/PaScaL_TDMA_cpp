@@ -32,7 +32,7 @@ add_compile_options(-O2)
 # 5. Add source and example subdirectories
 add_subdirectory(src)
 add_subdirectory(examples)
-add_subdirectory(examples/convection3D)
+add_subdirectory(examples/convection_3d)
 
 # 6. CUDA-specific configuration
 if(CUDA)

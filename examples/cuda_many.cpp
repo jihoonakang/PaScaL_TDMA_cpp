@@ -9,9 +9,9 @@
 #include <vector>
 #include <cmath>
 #include <cuda_runtime.h>
-#include "PaScaL_TDMA.cuh"
-#include "PaScaL_TDMA.hpp"
-#include "cudaEnv.hpp"
+#include "pascal_tdma.cuh"
+#include "pascal_tdma.hpp"
+#include "cuda_env.hpp"
 
 /**
  * @brief Main entry point for the cuPaScaL_TDMA many RHS GPU example.
@@ -88,7 +88,8 @@ int main(int argc, char** argv) {
         error += std::abs(d_h[i] - d_h_out[i]);
     }
 
-    if(!rank) std::cout << "Total error: " << error << std::endl;
+    if(!rank) 
+        std::cout << "Avg. RMS error = " << sqrt(error / nx / ny / nz)<< std::endl;
 
     // Free device memory and finalize MPI
     cudaFree(a_d); cudaFree(b_d); cudaFree(c_d); cudaFree(d_d);

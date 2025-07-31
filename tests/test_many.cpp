@@ -1,5 +1,5 @@
 /**
- * @file testMany.cpp
+ * @file test_many.cpp
  * @brief Unit test for distributed 2D TDMA (multiple right-hand sides) using MPI and GoogleTest.
  *
  * This test solves a 2D problem with TDMA in both x and y directions, using distributed arrays.
@@ -13,8 +13,8 @@
 #include <string>
 #include <stdexcept>
 
-#include "PaScaL_TDMA.hpp"
-#include "commLayout2D.hpp"
+#include "pascal_tdma.hpp"
+#include "comm_layout_2d.hpp"
 
 constexpr double tolerance = 1e-12;
 constexpr double a_diag = 10.0;

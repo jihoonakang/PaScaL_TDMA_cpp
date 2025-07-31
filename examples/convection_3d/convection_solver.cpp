@@ -1,4 +1,4 @@
-#include "convectionSolver.hpp"
+#include "convection_solver.hpp"
 
 void ConvectionSolver::solveThetaMany(dimArray<double>& theta,
                     const DomainLayout3D& dom3D,

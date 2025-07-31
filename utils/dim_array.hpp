@@ -1,5 +1,5 @@
 /**
- * @file dimArray.hpp
+ * @file dim_array.hpp
  * @brief Provides a 2D/3D array interface on top of std::vector.
  *
  * The dimArray class template allows resizing, indexing, conversion and

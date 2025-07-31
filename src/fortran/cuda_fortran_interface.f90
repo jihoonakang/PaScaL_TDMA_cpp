@@ -1,4 +1,4 @@
-module cuFortranInterface
+module cuda_fortran_interface
     use iso_c_binding
     implicit none
 
@@ -71,4 +71,4 @@ module cuFortranInterface
 
     end interface
 
-end module cuFortranInterface
+end module cuda_fortran_interface

@@ -7,8 +7,8 @@ find_package(Python COMPONENTS Interpreter Development REQUIRED)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -flto=auto")
 
 pybind11_add_module(PaScaL_TDMA_pybind
-    pyBinding.cpp
-    ${CMAKE_SOURCE_DIR}/src/PaScaL_TDMA.cpp
+    py_binding.cpp
+    ${CMAKE_SOURCE_DIR}/src/pascal_tdma.cpp
 )
 
 target_include_directories(PaScaL_TDMA_pybind PUBLIC
@@ -33,9 +33,9 @@ if(CUDA)
     # pybind11_add_module can't handle .cu files in cases.
     # Instead, We use add_library for CUDA support.
     add_library(PaScaL_TDMA_cuda_pybind MODULE
-        cupyBinding.cpp
-        ${CMAKE_SOURCE_DIR}/src/PaScaL_TDMA.cu
-        ${CMAKE_SOURCE_DIR}/src/TDMASolver.cu
+        cupy_binding.cpp
+        ${CMAKE_SOURCE_DIR}/src/pascal_tdma.cu
+        ${CMAKE_SOURCE_DIR}/src/tdma_solver.cu
     )
 
     set_target_properties(PaScaL_TDMA_cuda_pybind PROPERTIES
@@ -45,8 +45,8 @@ if(CUDA)
     )
 
     set_source_files_properties(
-        ${CMAKE_SOURCE_DIR}/src/PaScaL_TDMA.cu
-        ${CMAKE_SOURCE_DIR}/src/TDMASolver.cu
+        ${CMAKE_SOURCE_DIR}/src/pascal_tdma.cu
+        ${CMAKE_SOURCE_DIR}/src/tdma_solver.cu
         PROPERTIES LANGUAGE CUDA
     )
 

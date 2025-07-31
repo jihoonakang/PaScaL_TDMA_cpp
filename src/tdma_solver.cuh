@@ -1,5 +1,5 @@
 /**
- * @file TDMASolver.cuh
+ * @file tdma_solver.cuh
  * @brief Header file for GPU-accelerated tridiagonal system solvers using CUDA.
  *
  */

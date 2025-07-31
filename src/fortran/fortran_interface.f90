@@ -1,4 +1,4 @@
-module fortranInterface
+module fortran_interface
   	use iso_c_binding
   	implicit none
 
@@ -57,4 +57,4 @@ module fortranInterface
 
     end interface
 
-end module fortranInterface
+end module fortran_interface

@@ -1,5 +1,5 @@
 /**
- * @file PaScaL_TDMA.cpp
+ * @file pascal_tdma.cpp
  * @brief Implementation of planner and solver dispatch for PaScaL_TDMA library.
  *
  * Contains definitions of PTDMAPlanBase, PTDMAPlanSingle/Many/ManyRHS,
@@ -12,8 +12,8 @@
 #include <numeric>
 #include <stdexcept>
 #include <cassert>
-#include "PaScaL_TDMA.hpp"
-#include "TDMASolver.hpp"
+#include "pascal_tdma.hpp"
+#include "tdma_solver.hpp"
 
 namespace PaScaL_TDMA {
 
@@ -188,7 +188,7 @@ namespace PaScaL_TDMA {
         const int n_sys_rd = n_sys_;
         const int n_row_rd = 2;
     
-        n_sys_rt_ = Util::para_range_n(1, n_sys_rd, size_, rank_);
+        n_sys_rt_ = Util::paraRangeN(1, n_sys_rd, size_, rank_);
         n_row_rt_ = n_row_rd * size_;
     
         // Gather all local n_sys_rt_ to build subarray types
@@ -441,7 +441,7 @@ namespace PaScaL_TDMA {
         std::vector<int> n_sys_rt_array(size_);
 
         // Compute local and global problem dimensions
-        n_sys_rt_ = Util::para_range_n(1, n_sys_rd, size_, rank_);
+        n_sys_rt_ = Util::paraRangeN(1, n_sys_rd, size_, rank_);
         n_row_rt_ = n_row_rd * size_;
 
         MPI_Allgather(&n_sys_rt_, 1, MPI_INT, 

@@ -1,12 +1,12 @@
 /**
- * @file TDMASolver.cu
+ * @file tdma_solver.cu
  * @brief CUDA implementations for cuTDMASolver methods using custom kernels.
  */
 
 #include <cuda_runtime.h>
 #include <cassert>
 #include "config.hpp"
-#include "TDMASolver.cuh"
+#include "tdma_solver.cuh"
 
 /**
  * @brief Kernel to solve many independent tridiagonal systems in parallel.

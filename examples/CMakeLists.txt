@@ -14,14 +14,14 @@ function(add_cuda_example target_name source_file)
 endfunction()
 
 # CPU examples
-add_pascal_example(single_example    single.cpp)
-add_pascal_example(many_example      many.cpp)
-add_pascal_example(manyRHS_example   manyRHS.cpp)
+add_pascal_example(single_example   single.cpp)
+add_pascal_example(many_example     many.cpp)
+add_pascal_example(many_rhs_example many_rhs.cpp)
 
 # CUDA examples
 if(CUDA)
-    add_cuda_example(cuMany     cuMany.cpp)
-    add_cuda_example(cuManyRHS  cuManyRHS.cpp)
+    add_cuda_example(cuda_many_example      cuda_many.cpp)
+    add_cuda_example(cuda_many_rhs_example  cuda_many_rhs.cpp)
 endif()
 
 # Fortran examples

@@ -1,5 +1,5 @@
 /**
- * @file PaScaL_TDMA.cu
+ * @file pascal_tdma.cu
  * @brief Parallel TDMA solver implementation using CUDA-aware MPI.
  *
  * Contains:
@@ -17,8 +17,8 @@
 #include <numeric>
 #include <mpi.h>
 #include "config.hpp"
-#include "PaScaL_TDMA.cuh"
-#include "TDMASolver.cuh"
+#include "pascal_tdma.cuh"
+#include "tdma_solver.cuh"
 
 /**
  * @brief Initialize an array on the GPU to a given value.
@@ -614,7 +614,7 @@ namespace cuPaScaL_TDMA {
         std::vector<int> nz_sys_rt_array(size_);
     
         // Compute local and global problem dimensions
-        nz_sys_rt_ = Util::para_range_n(1, nz_sys_rd_, size_, rank_);
+        nz_sys_rt_ = Util::paraRangeN(1, nz_sys_rd_, size_, rank_);
         n_row_rt_ = n_row_rd_ * size_;
 
         MPI_Allgather(&nz_sys_rt_, 1, MPI_INT, nz_sys_rt_array.data(), 1, MPI_INT, comm_ptdma);
@@ -776,7 +776,7 @@ namespace cuPaScaL_TDMA {
         std::vector<int> nz_sys_rt_array(size_);
     
         // Compute local and global problem dimensions
-        nz_sys_rt_ = Util::para_range_n(1, nz_sys_rd_, size_, rank_);
+        nz_sys_rt_ = Util::paraRangeN(1, nz_sys_rd_, size_, rank_);
         n_row_rt_ = n_row_rd_ * size_;
 
         MPI_Allgather(&nz_sys_rt_, 1, MPI_INT, nz_sys_rt_array.data(), 1, MPI_INT, comm_ptdma);
