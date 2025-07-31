@@ -1,8 +1,11 @@
 /**
  * @file test_cuda_many.cpp
- * @brief Unit test for GPU-accelerated distributed TDMA (many right-hand sides) using CuPaScaL_TDMA, MPI, and GoogleTest.
+ * @brief Unit test for GPU-accelerated distributed TDMA (many right-hand sides) 
+ *        using CuPaScaL_TDMA, MPI, and GoogleTest.
  *
- * This test compares the results of the CPU (PaScaL_TDMA) and GPU (CuPaScaL_TDMA) solvers for consistency.
+ * This test compares the results of the CPU and GPU solvers for consistency.
+ * It checks if the GPU-accelerated multi-RHS TDMA solver produces numerically equivalent results 
+ * to the CPU version.
  */
 
 #include <gtest/gtest.h>
@@ -123,8 +126,8 @@ TEST(CuPaScaL_TDMA_many, Solve) {
     
     // Assert: Each value within tolerance
     for (int i = 0; i < N; i++) {
-        EXPECT_NEAR(d_h[i], d_h_out[i], tolerance) << 
-            "Mismatch at (i, j, k) = ( " << (int)(i/(ny*nz)) << ", " << (int)(i/nz)%ny << ", " << i%nz <<" )" << std::endl;
+        EXPECT_NEAR(d_h[i], d_h_out[i], tolerance) << "Mismatch at (i, j, k) = ( " 
+            << (int)(i/(ny*nz)) << ", " << (int)(i/nz)%ny << ", " << i%nz <<" )" << std::endl;
     }
 }
 

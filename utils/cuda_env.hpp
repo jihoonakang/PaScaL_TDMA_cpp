@@ -57,8 +57,7 @@ public:
             cudaDeviceProp prop;
             cudaGetDeviceProperties(&prop, i);
             if (!rank) {
-                std::printf("  - Device %d: %s | Compute Capability: %d.%d | "
-                            "Global Mem: %.2f GB\n",
+                std::printf(" - Device %d: %s | Compute Capa.: %d.%d | Global Mem: %.2f GB\n",
                             i, prop.name, prop.major, prop.minor, 
                             prop.totalGlobalMem / (1024.0 * 1024.0 * 1024.0));
             }

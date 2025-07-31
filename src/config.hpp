@@ -1,3 +1,9 @@
+/**
+ * @file cofig.hpp
+ * @brief Define thread numbers for CUDA.
+ *
+ */
+
 #pragma once
 
 #ifdef CUDA

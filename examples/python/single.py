@@ -1,14 +1,26 @@
 import numpy as np
 from mpi4py import MPI
-from PaScaL_TDMA_pybind import PTDMAPlanSingle, PTDMASolverSingle
+import PaScaL_TDMA_pybind as Tdma
 
-# 상수 정의
+# Constants
 a_diag = 10.0
 a_upper = -1.0
 a_lower = -1.0
 root = 0
 
 def generate_rhs(n, tdma_type):
+    """
+    Generate the right-hand side (RHS) vector and reference solution for a tridiagonal system.
+
+    :param n: Number of unknowns in the system.
+    :type n: int
+    :param tdma_type: Type of TDMA system. Must be either ``"standard"`` or ``"cyclic"``.
+    :type tdma_type: str
+    :return: A tuple ``(D, X)`` where ``D`` is the RHS vector and ``X`` is the reference solution.
+    :rtype: tuple[numpy.ndarray, numpy.ndarray]
+    :raises ValueError: If ``tdma_type`` is not ``"standard"`` or ``"cyclic"``.
+    """
+    
     A = np.full(n, a_lower)
     B = np.full(n, a_diag)
     C = np.full(n, a_upper)
@@ -31,6 +43,19 @@ def generate_rhs(n, tdma_type):
     return D, X
 
 def main(n, type_str):
+    """
+    Main function for solving a single tridiagonal system using MPI and PaScaL_TDMA.
+
+    The function distributes the workload across MPI processes, constructs and solves
+    the tridiagonal system, and computes the RMS error compared to a reference solution.
+
+    :param n: Total number of unknowns in the system.
+    :type n: int
+    :param type_str: Type of TDMA system. Must be either ``"standard"`` or ``"cyclic"``.
+    :type type_str: str
+    :raises ValueError: If ``type_str`` is not ``"standard"`` or ``"cyclic"``.
+    """
+
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
     size = comm.Get_size()
@@ -63,9 +88,9 @@ def main(n, type_str):
     c_sub = np.full(n_sub, a_upper)
 
     # Create and solve
-    plan = PTDMAPlanSingle()
+    plan = Tdma.PTDMAPlanSingle()
     plan.create(n_sub, comm.py2f(), is_cyclic)
-    PTDMASolverSingle.solve(plan, a_sub, b_sub, c_sub, d_sub)
+    Tdma.solveSingle(plan, a_sub, b_sub, c_sub, d_sub)
     plan.destroy()
 
     # Gather result

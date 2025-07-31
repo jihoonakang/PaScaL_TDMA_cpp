@@ -40,22 +40,34 @@ endif()
 include(GoogleTest)
 
 # Register tests with mpirun and specific arguments
-add_test(NAME PaScaL_TDMA_single_p4_n100_kernel_standard COMMAND mpirun -np 4 $<TARGET_FILE:test_single> 100 standard)
-add_test(NAME PaScaL_TDMA_single_p4_n100_kernel_cyclic COMMAND mpirun -np 4 $<TARGET_FILE:test_single> 100 cyclic)
-add_test(NAME PaScaL_TDMA_single_p4_n1000_kernel_standard COMMAND mpirun -np 4 $<TARGET_FILE:test_single> 1000 standard)
-add_test(NAME PaScaL_TDMA_single_p4_n1000_kernel_cyclic COMMAND mpirun -np 4 $<TARGET_FILE:test_single> 1000 cyclic)
+add_test(NAME PaScaL_TDMA_single_p4_n100_kernel_standard 
+         COMMAND mpirun -np 4 $<TARGET_FILE:test_single> 100 standard)
+add_test(NAME PaScaL_TDMA_single_p4_n100_kernel_cyclic 
+         COMMAND mpirun -np 4 $<TARGET_FILE:test_single> 100 cyclic)
+add_test(NAME PaScaL_TDMA_single_p4_n1000_kernel_standard 
+         COMMAND mpirun -np 4 $<TARGET_FILE:test_single> 1000 standard)
+add_test(NAME PaScaL_TDMA_single_p4_n1000_kernel_cyclic 
+         COMMAND mpirun -np 4 $<TARGET_FILE:test_single> 1000 cyclic)
 
-add_test(NAME PaScaL_TDMA_many_p1_n100x100_kernel_standard COMMAND mpirun -np 1 $<TARGET_FILE:test_many> 100 100)
-add_test(NAME PaScaL_TDMA_many_p9_n500x500_kernel_standard COMMAND mpirun -np 9 $<TARGET_FILE:test_many> 500 500)
+add_test(NAME PaScaL_TDMA_many_p1_n100x100_kernel_standard 
+         COMMAND mpirun -np 1 $<TARGET_FILE:test_many> 100 100)
+add_test(NAME PaScaL_TDMA_many_p9_n500x500_kernel_standard
+         COMMAND mpirun -np 9 $<TARGET_FILE:test_many> 500 500)
 
-add_test(NAME PaScaL_TDMA_many_RHS_p1_n10x10x10_kernel_standard COMMAND mpirun -np 1 $<TARGET_FILE:test_many_rhs> 10 10 10)
-add_test(NAME PaScaL_TDMA_many_RHS_p8_n100x100x100_kernel_standard COMMAND mpirun -np 8 $<TARGET_FILE:test_many_rhs> 20 20 20)
+add_test(NAME PaScaL_TDMA_many_RHS_p1_n10x10x10_kernel_standard
+         COMMAND mpirun -np 1 $<TARGET_FILE:test_many_rhs> 10 10 10)
+add_test(NAME PaScaL_TDMA_many_RHS_p8_n100x100x100_kernel_standard
+         COMMAND mpirun -np 8 $<TARGET_FILE:test_many_rhs> 20 20 20)
 
 if(CUDA)
-    add_test(NAME PaScaL_TDMA_cuda_many_p1_n10x20x20_kernel_standard COMMAND mpirun -np 1 $<TARGET_FILE:test_cuda_many> 10 40 40)
-    add_test(NAME PaScaL_TDMA_cuda_many_p4_n10x32x64_kernel_standard COMMAND mpirun -np 4 $<TARGET_FILE:test_cuda_many> 10 32 64)
-    add_test(NAME PaScaL_TDMA_cuda_many_RHS_p1_n10x20x20_kernel_standard COMMAND mpirun -np 1 $<TARGET_FILE:test_cuda_many_rhs> 10 40 40)
-    add_test(NAME PaScaL_TDMA_cuda_many_RHS_p4_n10x32x64_kernel_standard COMMAND mpirun -np 4 $<TARGET_FILE:test_cuda_many_rhs> 10 32 64)
+    add_test(NAME PaScaL_TDMA_cuda_many_p1_n10x20x20_kernel_standard
+             COMMAND mpirun -np 1 $<TARGET_FILE:test_cuda_many> 10 40 40)
+    add_test(NAME PaScaL_TDMA_cuda_many_p4_n10x32x64_kernel_standard
+             COMMAND mpirun -np 4 $<TARGET_FILE:test_cuda_many> 10 32 64)
+    add_test(NAME PaScaL_TDMA_cuda_many_RHS_p1_n10x20x20_kernel_standard
+             COMMAND mpirun -np 1 $<TARGET_FILE:test_cuda_many_rhs> 10 40 40)
+    add_test(NAME PaScaL_TDMA_cuda_many_RHS_p4_n10x32x64_kernel_standard
+             COMMAND mpirun -np 4 $<TARGET_FILE:test_cuda_many_rhs> 10 32 64)
 endif()
 
 # For automatic GoogleTest discovery, uncomment if needed:

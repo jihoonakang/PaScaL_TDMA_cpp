@@ -1,3 +1,13 @@
+!===================================================================================================
+!> @file        many_rhs_3d.f90
+!> @brief       Example program for solving multiple tridiagonal systems in 3D using PaScaL_TDMA.
+!> @details     This program distributes a 3D domain across MPI processes in a 2D process grid.
+!>              It solves tridiagonal systems in the z-, y-, and x-directions using the
+!>              PaScaL_TDMA library with many-RHS solvers. The final solution is compared
+!>              to a reference solution generated on the root process by computing the average
+!>              norm2 error.
+!===================================================================================================
+
 program main
 
     use mpi
@@ -24,7 +34,7 @@ program main
     double precision, allocatable, dimension(:) :: az, bz, cz
     double precision, allocatable, dimension(:,:,:) :: d_sub, d_sub_tr
 
-    type(c_ptr) :: px_many_rhs, py_many_rhs, pz_many_rhs  ! Plan for many tridiagonal systems of equations
+    type(c_ptr) :: px_many_rhs, py_many_rhs, pz_many_rhs   !< Plans for many RHS tridiagonal systems
 
     call MPI_Init(ierr)
     call MPI_Comm_size(MPI_COMM_WORLD, nprocs, ierr)
@@ -112,7 +122,9 @@ program main
     call MPI_Finalize(ierr)
 
 contains
-
+    !-----------------------------------------------------------------------------------------------
+    !> @brief Build count and displacement arrays for scatter/gather operations in 3D.
+    !-----------------------------------------------------------------------------------------------
     subroutine build_comm_info_array
 
         integer :: i
@@ -146,6 +158,9 @@ contains
     
     end subroutine build_comm_info_array
 
+    !-----------------------------------------------------------------------------------------------
+    !> @brief Build reference coefficients and RHS array on the root process for 3D domain.
+    !-----------------------------------------------------------------------------------------------
     subroutine build_global_coeff_array
 
         integer :: i, j, k
@@ -225,21 +240,9 @@ contains
     
     end subroutine build_global_coeff_array
 
-    subroutine dealloc_all
-
-        if (is_root) then
-            deallocate (d, x)
-        endif
-        deallocate (ax_sub, bx_sub, cx_sub)
-        deallocate (ay_sub, by_sub, cy_sub)
-        deallocate (az, bz, cz)
-        deallocate (d_sub)
-        deallocate (cnt_x, disp_x)
-        deallocate (cnt_y, disp_y)
-        deallocate (cnt_all, disp_all)
-
-    end subroutine dealloc_all    
-
+    !-----------------------------------------------------------------------------------------------
+    !> @brief Distribute the RHS array to all MPI processes in 3D.
+    !-----------------------------------------------------------------------------------------------
     subroutine distribute_rhs_array
 
         integer :: i, j, k, rank
@@ -287,6 +290,9 @@ contains
 
     end subroutine distribute_rhs_array
 
+    !-----------------------------------------------------------------------------------------------
+    !> @brief Collect the solution from all MPI processes to the root process.
+    !-----------------------------------------------------------------------------------------------
     subroutine collect_solution_array
 
         integer :: i, j, k, rank
@@ -336,8 +342,29 @@ contains
 
     end subroutine collect_solution_array
 
+    !-----------------------------------------------------------------------------------------------
+    !> @brief Deallocate all dynamically allocated arrays.
+    !-----------------------------------------------------------------------------------------------
+    subroutine dealloc_all
+
+        if (is_root) then
+            deallocate (d, x)
+        endif
+        deallocate (ax_sub, bx_sub, cx_sub)
+        deallocate (ay_sub, by_sub, cy_sub)
+        deallocate (az, bz, cz)
+        deallocate (d_sub)
+        deallocate (cnt_x, disp_x)
+        deallocate (cnt_y, disp_y)
+        deallocate (cnt_all, disp_all)
+
+    end subroutine dealloc_all    
+
 end program main
 
+!---------------------------------------------------------------------------------------------------
+!> @brief Compute the number of elements assigned to each process in 1D partitioning.
+!---------------------------------------------------------------------------------------------------
 integer function para_range_n(n1, n2, nprocs, myrank) result(n)
 
     implicit none

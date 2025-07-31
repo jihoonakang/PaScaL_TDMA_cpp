@@ -140,8 +140,8 @@ void distributeRHS(DimArray<double>& d_sub, const DimArray<double>& d,
  * @test
  * @brief Distributed 2D TDMA test: solves in x- then y-direction and checks solution.
  *
- * This test reads grid size from command line, sets up 2D domain decomposition,
- * distributes the RHS, solves sequentially along x and y, and compares result with the exact solution.
+ * This test reads grid size from command line, makes 2D domain decomposition, distributes the RHS, 
+ * solves sequentially along x and y, and compares result with the solution.
  *
  * Command-line arguments:
  * - nx: grid size in x direction

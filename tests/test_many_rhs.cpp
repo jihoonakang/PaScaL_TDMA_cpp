@@ -2,7 +2,7 @@
  * @file test_many_rhs.cpp
  * @brief Unit test for distributed 3D TDMA (multiple right-hand sides) using MPI and GoogleTest.
  *
- * This test solves a 3D problem using TDMA sweeps along each dimension, distributed among MPI processes.
+ * This test solves a 3D problem using TDMA sweeps along each dimension.
  * The known analytical solution is compared with the computed result for validation.
  */
 
@@ -182,8 +182,8 @@ void distributeRHS(DimArray<double>& d_sub, const DimArray<double>& d,
  * @test
  * @brief Distributed 3D TDMA test: solves in x, y, z directions and checks solution.
  *
- * This test reads grid size from command line, sets up 3D domain decomposition,
- * distributes the RHS, applies sweeps along each dimension, and compares result with the exact solution.
+ * This test reads grid size from command line, makes 3D domain decomposition, distributes the RHS, 
+ * applies sweeps along each dimension, and compares result with the exact solution.
  *
  * Command-line arguments:
  * - nx: grid size in x direction

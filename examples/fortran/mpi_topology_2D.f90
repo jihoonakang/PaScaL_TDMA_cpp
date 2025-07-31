@@ -1,42 +1,53 @@
+!===================================================================================================
+!> @file        mpi_topology_2d.f90
+!> @brief       Module for creating a 2D Cartesian MPI topology and its subcommunicators.
+!> @details     This module provides functionality to create and destroy a 2D Cartesian topology for
+!>              MPI processes. It defines two 1D subcommunicators (x- and y-directions) and stores
+!>              rank, size, and neighbor information for each subcommunicator.
+!===================================================================================================
 
-!> @brief       Module for creating the cartesian topology of the MPI processes and subcommunicators.
-!> @details     This module has tow subcommunicators in each-direction and related subroutines.
-!>
-module mpi_topology_2D
+module mpi_topology_2d
 
     use mpi
-
+    
     implicit none
 
-    integer, public :: mpi_world_cart       !< Communicator for cartesian topology
-    integer, public :: np_dim(0:1)          !< Number of MPI processes in 2D topology
-    logical, public :: period(0:1)          !< Periodicity in each direction
+    !-----------------------------------------------------------------------------------------------
+    !> @brief Global communicator for Cartesian topology
+    integer, public :: mpi_world_cart
 
-    !> @brief   Type variable for the information of 1D communicator
+    !> @brief Number of MPI processes in each dimension (2D topology)
+    integer, public :: np_dim(0:1)
+
+    !> @brief Periodicity in each dimension
+    logical, public :: period(0:1)
+
+    !-----------------------------------------------------------------------------------------------
+    !> @brief Type for holding information about a 1D Cartesian subcommunicator.
     type, public :: cart_comm_1d
-        integer :: myrank                   !< Rank ID in current communicator
-        integer :: nprocs                   !< Number of processes in current communicator
-        integer :: west_rank                !< Previous rank ID in current communicator
-        integer :: east_rank                !< Next rank ID in current communicator
-        integer :: mpi_comm                 !< Current communicator
+        integer :: myrank       !< Rank in the current communicator
+        integer :: nprocs       !< Number of processes in the communicator
+        integer :: west_rank    !< Rank of the previous neighbor
+        integer :: east_rank    !< Rank of the next neighbor
+        integer :: mpi_comm     !< MPI communicator handle
     end type cart_comm_1d
 
-    type(cart_comm_1d), public :: comm_1d_x     !< Subcommunicator information in x-direction
-    type(cart_comm_1d), public :: comm_1d_y     !< Subcommunicator information in y-direction
+    !-----------------------------------------------------------------------------------------------
+    !> @brief Subcommunicator information in x- and y-directions
+    type(cart_comm_1d), public :: comm_1d_x
+    type(cart_comm_1d), public :: comm_1d_y
 
     private
+    public :: mpi_topology_make, mpi_topology_clean
 
-    public  :: mpi_topology_make
-    public  :: mpi_topology_clean
-
-    contains
-
-    !>
-    !> @brief       Destroy the communicator for cartesian topology.
-    !>
+contains
+    !-----------------------------------------------------------------------------------------------
+    !> @brief Destroy the communicators for the Cartesian topology and subcommunicators.
+    !-----------------------------------------------------------------------------------------------
     subroutine mpi_topology_clean()
 
         implicit none
+
         integer :: ierr
 
         call MPI_Comm_free(comm_1d_x%mpi_comm, ierr)
@@ -45,40 +56,33 @@ module mpi_topology_2D
 
     end subroutine mpi_topology_clean
 
-    !>
-    !> @brief       Create the cartesian topology for the MPI processes and subcommunicators.
-    !>
+    !-----------------------------------------------------------------------------------------------
+    !> @brief Create a 2D Cartesian topology and its 1D subcommunicators.
+    !-----------------------------------------------------------------------------------------------
     subroutine mpi_topology_make()
+
         implicit none
+
         logical :: remain(0:1)
         integer :: ierr
 
-        ! Create the cartesian topology.
-        call MPI_Cart_create( MPI_COMM_WORLD,    &!  input  | integer      | Input communicator (handle).
-                              2,                 &!  input  | integer      | Number of dimensions of Cartesian grid (integer).
-                              np_dim,            &!  input  | integer(1:3) | Integer array of size ndims specifying the number of processes in each dimension.
-                              period,            &!  input  | logical(1:3) | Logical array of size ndims specifying whether the grid is periodic (true=1) or not (false=0) in each dimension.
-                              .false.,           &!  input  | logical      | Ranking may be reordered (true=1) or not (false=0) (logical).
-                              mpi_world_cart,    &! *output | integer      | Communicator with new Cartesian topology (handle).
-                              ierr              &!  output | integer      | Fortran only: Error status
-                            )
+        ! Create the 2D Cartesian topology
+        call MPI_Cart_create(MPI_COMM_WORLD, 2, np_dim, period, .false., mpi_world_cart, ierr)
 
-        ! Create subcommunicators and assign two neighboring processes in the x-direction.
-        remain(0) = .true.
-        remain(1) = .false.
-        call MPI_Cart_sub( mpi_world_cart, remain, comm_1d_x%mpi_comm, ierr)
+        ! Create x-direction subcommunicator
+        remain = [ .true., .false. ]
+        call MPI_Cart_sub(mpi_world_cart, remain, comm_1d_x%mpi_comm, ierr)
         call MPI_Comm_rank(comm_1d_x%mpi_comm, comm_1d_x%myrank, ierr)
         call MPI_Comm_size(comm_1d_x%mpi_comm, comm_1d_x%nprocs, ierr)
         call MPI_Cart_shift(comm_1d_x%mpi_comm, 0, 1, comm_1d_x%west_rank, comm_1d_x%east_rank, ierr)
 
-        ! Create subcommunicators and assign two neighboring processes in the y-direction
-        remain(0) = .false.
-        remain(1) = .true.
-        call MPI_Cart_sub( mpi_world_cart, remain, comm_1d_y%mpi_comm, ierr)
+        ! Create y-direction subcommunicator
+        remain = [ .false., .true. ]
+        call MPI_Cart_sub(mpi_world_cart, remain, comm_1d_y%mpi_comm, ierr)
         call MPI_Comm_rank(comm_1d_y%mpi_comm, comm_1d_y%myrank, ierr)
         call MPI_Comm_size(comm_1d_y%mpi_comm, comm_1d_y%nprocs, ierr)
         call MPI_Cart_shift(comm_1d_y%mpi_comm, 0, 1, comm_1d_y%west_rank, comm_1d_y%east_rank, ierr)
 
     end subroutine mpi_topology_make
 
-end module mpi_topology_2D
+end module mpi_topology_2d
